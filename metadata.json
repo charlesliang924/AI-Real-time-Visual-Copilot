@@ -1,0 +1,9 @@
+{
+  "name": "AI Real-time Visual Copilot",
+  "description": "A web-based AI copilot that captures screen and microphone, sending them to Gemini Multimodal Live API for real-time voice guidance.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

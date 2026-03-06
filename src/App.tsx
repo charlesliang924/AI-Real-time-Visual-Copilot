@@ -77,11 +77,21 @@ export default function App() {
           onmessage: async (message: LiveServerMessage) => {
             // 解析 WebSocket 返回的 JSON，提取 serverContent.modelTurn 中的 PCM 音频数据
             const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
-            if (base64Audio && pcmPlayerRef.current) {
-              setIsAiSpeaking(true);
-              pcmPlayerRef.current.playBase64(base64Audio);
-              // 简单的心跳重置说话状态
-              setTimeout(() => setIsAiSpeaking(false), 500);
+            if (base64Audio) {
+              if (pcmPlayerRef.current) {
+                try {
+                  // 尝试播放音频
+                  await pcmPlayerRef.current.playBase64(base64Audio);
+                  setIsAiSpeaking(true);
+                  // 简单的心跳重置说话状态
+                  setTimeout(() => setIsAiSpeaking(false), 500);
+                } catch (playErr) {
+                  console.error('[App] Audio playback error:', playErr);
+                  addLog(`音频播放失败: ${playErr}`);
+                }
+              } else {
+                console.warn('[App] Received audio but player is not initialized');
+              }
             }
             
             // 处理打断

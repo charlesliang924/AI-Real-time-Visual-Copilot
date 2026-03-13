@@ -4,32 +4,51 @@ export class AudioRecorder {
   private source: MediaStreamAudioSourceNode | null = null;
   private processor: AudioWorkletNode | null = null;
 
-  async start(onData: (base64: string) => void) {
+  async start(onData: (base64: string) => void, onVolume?: (rms: number) => void) {
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // 尝试强制 16kHz，如果浏览器不支持，后续可能需要重采样（此处简化处理）
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      
       this.audioCtx = new AudioContext({ sampleRate: 16000 });
+      if (this.audioCtx.state === 'suspended') {
+        await this.audioCtx.resume();
+      }
       
       const processorCode = `
         class PCMProcessor extends AudioWorkletProcessor {
           constructor() {
             super();
-            this.bufferSize = 0;
+            this.bufferSize = 4096; // 256ms at 16kHz
+            this.buffer = new Int16Array(this.bufferSize);
+            this.offset = 0;
           }
           process(inputs, outputs, parameters) {
             const input = inputs[0];
             if (input && input.length > 0) {
               const channelData = input[0];
-              const pcm16 = new Int16Array(channelData.length);
-              let sum = 0;
               for (let i = 0; i < channelData.length; i++) {
                 let s = Math.max(-1, Math.min(1, channelData[i]));
-                sum += s * s;
-                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                this.buffer[this.offset++] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                
+                if (this.offset >= this.bufferSize) {
+                  let sum = 0;
+                  for (let j = 0; j < this.bufferSize; j++) {
+                    const val = this.buffer[j] / 32768.0;
+                    sum += val * val;
+                  }
+                  const rms = Math.sqrt(sum / this.bufferSize);
+                  
+                  this.port.postMessage({ buffer: this.buffer.slice(0).buffer, rms });
+                  this.offset = 0;
+                }
               }
-              // 计算简单的 RMS 音量用于调试
-              const rms = Math.sqrt(sum / channelData.length);
-              this.port.postMessage({ buffer: pcm16.buffer, rms });
             }
             return true;
           }
@@ -48,12 +67,14 @@ export class AudioRecorder {
       this.processor.port.onmessage = (e) => {
         const { buffer, rms } = e.data;
         
+        if (onVolume) onVolume(rms);
+        
         // 每 2 秒打印一次麦克风状态，帮助排查静音问题
         const now = Date.now();
         if (now - lastLogTime > 2000) {
           console.log(`[AudioRecorder] Mic RMS: ${rms.toFixed(4)} (SampleRate: ${this.audioCtx?.sampleRate})`);
           if (rms < 0.001) {
-            console.warn('[AudioRecorder] 麦克风输入音量极低，可能是静音或设备问题');
+            console.warn('[AudioRecorder] 麦克风输入音量极低，可能是静音、硬件问题或系统权限未开启');
           }
           lastLogTime = now;
         }

@@ -9,6 +9,7 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isMicActive, setIsMicActive] = useState(false);
+  const [micVolume, setMicVolume] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   
@@ -188,6 +189,7 @@ export default function App() {
         audioRecorderRef.current = null;
       }
       setIsMicActive(false);
+      setMicVolume(0);
       addLog('已关闭麦克风');
     } else {
       try {
@@ -201,6 +203,8 @@ export default function App() {
               }]);
             });
           }
+        }, (rms) => {
+          setMicVolume(rms);
         });
         setIsMicActive(true);
         addLog('已开启麦克风');
@@ -292,7 +296,7 @@ export default function App() {
 
               <button
                 onClick={toggleMic}
-                className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all duration-200 ${
+                className={`relative w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all duration-200 ${
                   isMicActive 
                     ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20' 
                     : 'bg-zinc-800 text-white hover:bg-zinc-700 border border-white/5'
@@ -300,6 +304,15 @@ export default function App() {
               >
                 {isMicActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                 {isMicActive ? '关闭麦克风' : '开启麦克风'}
+                
+                {isMicActive && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <div 
+                      className="w-1.5 bg-emerald-400 rounded-full transition-all duration-75" 
+                      style={{ height: `${Math.max(4, Math.min(24, micVolume * 500))}px` }} 
+                    />
+                  </div>
+                )}
               </button>
 
               <div className="h-px bg-white/10 my-2" />

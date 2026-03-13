@@ -2,15 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { Mic, MicOff, MonitorUp, MonitorOff, Play, Square, Activity, Terminal, LogOut, Loader2 } from 'lucide-react';
 import { AudioRecorder, PCMPlayer } from './lib/audio';
-import { auth } from './lib/firebase';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import Auth from './components/Auth';
+import { useUser, useAuth, SignIn } from '@clerk/clerk-react';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const { isLoaded, isSignedIn, user } = useUser();
+  const { signOut } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isMicActive, setIsMicActive] = useState(false);
@@ -221,13 +219,7 @@ export default function App() {
 
   // 组件卸载时清理
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setIsAuthReady(true);
-    });
-
     return () => {
-      unsubscribe();
       stopScreenShare();
       disconnectAI();
       if (audioRecorderRef.current) {
@@ -239,13 +231,32 @@ export default function App() {
   const handleSignOut = async () => {
     try {
       disconnectAI();
-      await signOut(auth);
+      await signOut();
     } catch (error) {
       console.error('Sign out error:', error);
     }
   };
 
-  if (!isAuthReady) {
+  if (!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-zinc-900 border border-white/10 p-8 rounded-2xl max-w-md">
+          <h2 className="text-xl font-bold text-white mb-4">需要配置 Clerk</h2>
+          <p className="text-zinc-400 mb-6 text-sm">
+            请在环境设置中添加 <code>VITE_CLERK_PUBLISHABLE_KEY</code>。
+          </p>
+          <div className="text-left text-xs text-zinc-500 space-y-2 bg-black/50 p-4 rounded-xl">
+            <p>1. 访问 <a href="https://dashboard.clerk.com/" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">Clerk Dashboard</a></p>
+            <p>2. 创建一个新应用 (选择 Phone 登录)</p>
+            <p>3. 复制 Publishable Key</p>
+            <p>4. 填入当前应用的环境变量中</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
@@ -253,8 +264,12 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    return <Auth />;
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
+        <SignIn routing="hash" />
+      </div>
+    );
   }
 
   return (
@@ -288,7 +303,7 @@ export default function App() {
                 title="退出登录"
               >
                 <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">{user.phoneNumber}</span>
+                <span className="hidden sm:inline">{user.primaryPhoneNumber?.phoneNumber || user.primaryEmailAddress?.emailAddress || user.fullName || '用户'}</span>
               </button>
             </div>
           </div>

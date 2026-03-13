@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
-import { Mic, MicOff, MonitorUp, MonitorOff, Play, Square, Activity, Terminal } from 'lucide-react';
+import { Mic, MicOff, MonitorUp, MonitorOff, Play, Square, Activity, Terminal, LogOut, Loader2 } from 'lucide-react';
 import { AudioRecorder, PCMPlayer } from './lib/audio';
+import { auth } from './lib/firebase';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import Auth from './components/Auth';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isMicActive, setIsMicActive] = useState(false);
@@ -216,7 +221,13 @@ export default function App() {
 
   // 组件卸载时清理
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setIsAuthReady(true);
+    });
+
     return () => {
+      unsubscribe();
       stopScreenShare();
       disconnectAI();
       if (audioRecorderRef.current) {
@@ -224,6 +235,27 @@ export default function App() {
       }
     };
   }, []);
+
+  const handleSignOut = async () => {
+    try {
+      disconnectAI();
+      await signOut(auth);
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth />;
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-gray-100 font-sans selection:bg-indigo-500/30">
@@ -250,6 +282,14 @@ export default function App() {
                   AI 正在说话
                 </div>
               )}
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-all"
+                title="退出登录"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">{user.phoneNumber}</span>
+              </button>
             </div>
           </div>
 

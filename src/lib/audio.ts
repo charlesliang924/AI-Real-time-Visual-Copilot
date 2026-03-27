@@ -115,6 +115,16 @@ export class PCMPlayer {
 
   constructor(sampleRate = 24000) {
     this.audioCtx = new AudioContext({ sampleRate });
+    this.unlock();
+  }
+
+  private unlock() {
+    // Play a silent buffer to unlock the AudioContext on mobile/Safari
+    const buffer = this.audioCtx.createBuffer(1, 1, 22050);
+    const source = this.audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.audioCtx.destination);
+    source.start(0);
   }
 
   async ensureContext() {
@@ -133,7 +143,11 @@ export class PCMPlayer {
     for (let i = 0; i < len; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
-    const int16Array = new Int16Array(bytes.buffer);
+    
+    // Ensure even length for Int16Array to avoid RangeError
+    const validLen = len % 2 === 0 ? len : len - 1;
+    const int16Array = new Int16Array(bytes.buffer, 0, validLen / 2);
+    
     const float32Array = new Float32Array(int16Array.length);
     for (let i = 0; i < int16Array.length; i++) {
       float32Array[i] = int16Array[i] / 0x8000;

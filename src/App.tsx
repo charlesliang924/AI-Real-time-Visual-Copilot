@@ -6,8 +6,6 @@ import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import Auth from './components/Auth';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -73,8 +71,16 @@ export default function App() {
       addLog('正在连接 Gemini Live API...');
       pcmPlayerRef.current = new PCMPlayer();
       
+      // Use VITE_GEMINI_API_KEY for Vercel, fallback to process.env for AI Studio
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (import.meta as any).env?.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("未找到 API Key，请在环境变量中设置 VITE_GEMINI_API_KEY");
+      }
+      
+      const ai = new GoogleGenAI({ apiKey });
+      
       const sessionPromise = ai.live.connect({
-        model: "gemini-2.5-flash-native-audio-preview-09-2025",
+        model: "gemini-3.1-flash-live-preview",
         callbacks: {
           onopen: () => {
             addLog('WebSocket 连接成功！');
@@ -163,12 +169,14 @@ export default function App() {
               // 转换为 Base64 JPEG 格式
               const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
               
-              // 封装在 realtimeInput 的 mediaChunks 中发送
+              // 封装在 realtimeInput 中发送
               sessionRef.current.then((session: any) => {
-                session.sendRealtimeInput([{
-                  mimeType: 'image/jpeg',
-                  data: base64Data
-                }]);
+                session.sendRealtimeInput({
+                  video: {
+                    mimeType: 'image/jpeg',
+                    data: base64Data
+                  }
+                });
               });
             }
           }
@@ -202,10 +210,12 @@ export default function App() {
         await audioRecorderRef.current.start((base64Data) => {
           if (isConnected && sessionRef.current) {
             sessionRef.current.then((session: any) => {
-              session.sendRealtimeInput([{
-                mimeType: 'audio/pcm;rate=16000',
-                data: base64Data
-              }]);
+              session.sendRealtimeInput({
+                audio: {
+                  mimeType: 'audio/pcm;rate=16000',
+                  data: base64Data
+                }
+              });
             });
           }
         }, (rms) => {
@@ -370,7 +380,7 @@ export default function App() {
               </button>
               
               <p className="text-xs text-zinc-500 text-center mt-4">
-                API Key 已通过环境变量安全注入，无需手动输入。
+                API Key 已通过环境变量 (VITE_GEMINI_API_KEY) 安全注入，无需手动输入。
               </p>
             </div>
           </div>

@@ -13,7 +13,13 @@ export default function App() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isMicActive, setIsMicActive] = useState(false);
   const [micVolume, setMicVolume] = useState(0);
+  const [noiseThreshold, setNoiseThreshold] = useState(0.005);
+  const noiseThresholdRef = useRef(0.005);
   const [logs, setLogs] = useState<string[]>([]);
+  
+  useEffect(() => {
+    noiseThresholdRef.current = noiseThreshold;
+  }, [noiseThreshold]);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -25,6 +31,8 @@ export default function App() {
   const pcmPlayerRef = useRef<PCMPlayer | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const videoIntervalRef = useRef<number | null>(null);
+  const isSpeakingRef = useRef<boolean>(false);
+  const silenceFramesRef = useRef<number>(0);
   
   const addLog = (msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`].slice(-50));
@@ -86,6 +94,12 @@ export default function App() {
           onopen: () => {
             addLog('WebSocket 连接成功！');
             setIsConnected(true);
+            // 发送一条初始文本消息，让 AI 主动打招呼，提供连接成功的语音反馈
+            if (sessionRef.current) {
+              sessionRef.current.then((session: any) => {
+                session.sendRealtimeInput({ text: "你好！我已经连接成功了，请用简短、热情的一句话和我打个招呼，告诉我你已经准备好做我的视觉副驾了。" });
+              });
+            }
           },
           onmessage: async (message: LiveServerMessage) => {
             // 解析 WebSocket 返回的 JSON，提取 serverContent.modelTurn 中的 PCM 音频数据
@@ -213,8 +227,21 @@ export default function App() {
     } else {
       try {
         audioRecorderRef.current = new AudioRecorder();
-        await audioRecorderRef.current.start((base64Data) => {
-          if (isConnected && sessionRef.current) {
+        await audioRecorderRef.current.start((base64Data, rms) => {
+          // 客户端 VAD (噪音门限)：低于阈值的背景噪音不发送，防止打断 AI
+          if (rms > noiseThresholdRef.current) {
+            isSpeakingRef.current = true;
+            silenceFramesRef.current = 0;
+          } else {
+            silenceFramesRef.current++;
+            // 缓冲约 1 秒 (4 帧 * 256ms) 后判定为静音
+            if (silenceFramesRef.current > 4) {
+              isSpeakingRef.current = false;
+            }
+          }
+
+          // 使用 sessionRef.current 判断连接状态，避免 isConnected 的闭包陷阱
+          if (sessionRef.current && isSpeakingRef.current) {
             sessionRef.current.then((session: any) => {
               session.sendRealtimeInput({
                 audio: {
@@ -350,26 +377,43 @@ export default function App() {
                 {isScreenSharing ? '关闭屏幕共享' : '开启屏幕共享'}
               </button>
 
-              <button
-                onClick={toggleMic}
-                className={`relative w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all duration-200 ${
-                  isMicActive 
-                    ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20' 
-                    : 'bg-zinc-800 text-white hover:bg-zinc-700 border border-white/5'
-                }`}
-              >
-                {isMicActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                {isMicActive ? '关闭麦克风' : '开启麦克风'}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={toggleMic}
+                  className={`relative w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all duration-200 ${
+                    isMicActive 
+                      ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20' 
+                      : 'bg-zinc-800 text-white hover:bg-zinc-700 border border-white/5'
+                  }`}
+                >
+                  {isMicActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                  {isMicActive ? '关闭麦克风' : '开启麦克风'}
+                  
+                  {isMicActive && (
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      <div 
+                        className="w-1.5 bg-emerald-400 rounded-full transition-all duration-75" 
+                        style={{ height: `${Math.max(4, Math.min(24, micVolume * 500))}px` }} 
+                      />
+                    </div>
+                  )}
+                </button>
                 
-                {isMicActive && (
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                    <div 
-                      className="w-1.5 bg-emerald-400 rounded-full transition-all duration-75" 
-                      style={{ height: `${Math.max(4, Math.min(24, micVolume * 500))}px` }} 
-                    />
-                  </div>
-                )}
-              </button>
+                <div className="flex items-center gap-3 px-3 py-2 bg-black/20 rounded-xl border border-white/5">
+                  <span className="text-xs text-zinc-400 whitespace-nowrap">收音阈值</span>
+                  <input
+                    type="range"
+                    min="0.001"
+                    max="0.05"
+                    step="0.001"
+                    value={noiseThreshold}
+                    onChange={(e) => setNoiseThreshold(parseFloat(e.target.value))}
+                    className="flex-1 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                    title="调高可过滤背景噪音，防止打断 AI"
+                  />
+                  <span className="text-xs text-zinc-400 font-mono w-8 text-right">{noiseThreshold.toFixed(3)}</span>
+                </div>
+              </div>
 
               <div className="h-px bg-white/10 my-2" />
 

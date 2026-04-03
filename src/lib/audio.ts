@@ -4,7 +4,7 @@ export class AudioRecorder {
   private source: MediaStreamAudioSourceNode | null = null;
   private processor: AudioWorkletNode | null = null;
 
-  async start(onData: (base64: string) => void, onVolume?: (rms: number) => void) {
+  async start(onData: (base64: string, rms: number) => void, onVolume?: (rms: number) => void) {
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -84,7 +84,7 @@ export class AudioRecorder {
         for (let i = 0; i < bytes.byteLength; i++) {
           binary += String.fromCharCode(bytes[i]);
         }
-        onData(window.btoa(binary));
+        onData(window.btoa(binary), rms);
       };
       
       this.source.connect(this.processor);

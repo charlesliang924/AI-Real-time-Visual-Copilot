@@ -2,15 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { Mic, MicOff, MonitorUp, MonitorOff, Play, Square, Activity, Terminal, LogOut, Loader2 } from 'lucide-react';
 import { AudioRecorder, PCMPlayer } from './lib/audio';
-import { auth } from './lib/firebase';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import Auth from './components/Auth';
+import { PersonaSelector, defaultPersonas } from './components/PersonaSelector';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<{ id: string, username: string } | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [currentPersonaId, setCurrentPersonaId] = useState<string>('default');
+  const systemPromptRef = useRef<string>(defaultPersonas[0].systemPrompt);
   const [isMicActive, setIsMicActive] = useState(false);
   const [micVolume, setMicVolume] = useState(0);
   const [noiseThreshold, setNoiseThreshold] = useState(0.005);
@@ -147,8 +148,8 @@ export default function App() {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
           },
-          // 注入系统指令
-          systemInstruction: "你现在是我的专属游戏陪玩与智能视觉副驾。你可以看到我共享的实时屏幕画面，并听到我的语音指令。请根据我当前的游戏画面进度，结合我的问题，提供精准、简短、直接的语音指导和攻略。如果我切换到了写代码或学习的画面，请自动适应场景，变成一位专业导师。说话请保持自然、幽默、口语化，像坐在我旁边的好朋友一样。",
+          // 注入系统指令 (根据选择的角色)
+          systemInstruction: systemPromptRef.current,
         },
       });
       
@@ -262,15 +263,33 @@ export default function App() {
     }
   };
 
-  // 组件卸载时清理
+  // 组件挂载时检查 JWT Token
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setIsAuthReady(true);
+        return;
+      }
+      try {
+        const resp = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          setUser(data.user);
+        } else {
+          localStorage.removeItem('token');
+        }
+      } catch (err) {
+        console.error('Failed to restore auth', err);
+        localStorage.removeItem('token');
+      }
       setIsAuthReady(true);
-    });
+    };
+    checkAuth();
 
     return () => {
-      unsubscribe();
       stopScreenShare();
       disconnectAI();
       if (audioRecorderRef.current) {
@@ -279,13 +298,10 @@ export default function App() {
     };
   }, []);
 
-  const handleSignOut = async () => {
-    try {
-      disconnectAI();
-      await signOut(auth);
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
+  const handleSignOut = () => {
+    disconnectAI();
+    localStorage.removeItem('token');
+    setUser(null);
   };
 
   if (!isAuthReady) {
@@ -297,7 +313,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <Auth />;
+    return <Auth onLogin={setUser} />;
   }
 
   return (
@@ -325,13 +341,26 @@ export default function App() {
                   AI 正在说话
                 </div>
               )}
+              
+              {/* Persona Selector Header Component */}
+              <PersonaSelector 
+                currentPersonaId={currentPersonaId} 
+                onSelect={(id, prompt) => {
+                  setCurrentPersonaId(id);
+                  systemPromptRef.current = prompt;
+                  if (isConnected) {
+                    addLog('角色切换成功。将在下一次重新连接时生效。');
+                  }
+                }} 
+              />
+              
               <button
                 onClick={handleSignOut}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-all"
                 title="退出登录"
               >
                 <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">{user.phoneNumber}</span>
+                <span className="hidden sm:inline">{user.username}</span>
               </button>
             </div>
           </div>

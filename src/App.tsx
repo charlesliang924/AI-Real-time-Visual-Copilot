@@ -80,11 +80,29 @@ export default function App() {
       addLog('正在连接 Gemini Live API...');
       pcmPlayerRef.current = new PCMPlayer();
       
-      // Use VITE_GEMINI_API_KEY for Vercel, fallback to process.env for AI Studio
+      let apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
       // @ts-ignore
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey && typeof process !== 'undefined' && process.env.GEMINI_API_KEY) {
+        // @ts-ignore
+        apiKey = process.env.GEMINI_API_KEY;
+      }
+
       if (!apiKey) {
-        throw new Error("未找到 API Key，请在环境变量中设置 VITE_GEMINI_API_KEY");
+        try {
+          const resp = await fetch('/api/config');
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.geminiApiKey) {
+              apiKey = data.geminiApiKey;
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch API key from server", err);
+        }
+      }
+
+      if (!apiKey) {
+        throw new Error("未找到 API Key，请在后端环境或环境变量中设置 VITE_GEMINI_API_KEY");
       }
       
       const ai = new GoogleGenAI({ apiKey });

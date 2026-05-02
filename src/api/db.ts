@@ -2,10 +2,29 @@
 // We use dynamic imports for native Node modules so Cloudflare's bundler doesn't fail.
 
 let localDbCache: any = null;
+let d1Initialized = false;
 
 export const query = async (env: any, sql: string, params: any[] = []) => {
   if (env && env.DB) {
     // Cloudflare D1
+    if (!d1Initialized) {
+      d1Initialized = true;
+      try {
+        await env.DB.exec(`
+          CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE,
+            password_hash TEXT,
+            created_at INTEGER,
+            is_approved INTEGER DEFAULT 0
+          );
+        `);
+      } catch(e) {}
+      try {
+        await env.DB.exec('ALTER TABLE users ADD COLUMN is_approved INTEGER DEFAULT 0;');
+      } catch(e) {}
+    }
+    
     const stmt = env.DB.prepare(sql);
     let binded = stmt;
     if (params.length > 0) {

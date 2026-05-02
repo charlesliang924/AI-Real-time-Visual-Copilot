@@ -12,6 +12,7 @@ export default function App() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [currentPersonaId, setCurrentPersonaId] = useState<string>('default');
   const systemPromptRef = useRef<string>(defaultPersonas[0].systemPrompt);
+  const [memories, setMemories] = useState<string[]>([]);
   const [isMicActive, setIsMicActive] = useState(false);
   const [micVolume, setMicVolume] = useState(0);
   const [noiseThreshold, setNoiseThreshold] = useState(0.005);
@@ -121,10 +122,41 @@ export default function App() {
             }
           },
           onmessage: async (message: LiveServerMessage) => {
-            // 解析 WebSocket 返回的 JSON，提取 serverContent.modelTurn 中的 PCM 音频数据
-            const parts = message.serverContent?.modelTurn?.parts;
-            if (parts) {
-              for (const part of parts) {
+            // 处理 Tool Call / Function Call (Skills 表现)
+            const serverContent = message.serverContent;
+            if (serverContent?.modelTurn?.parts) {
+              for (const part of serverContent.modelTurn.parts) {
+                if (part.functionCall) {
+                  const fn = part.functionCall as any;
+                  const args = fn.args || {};
+                  addLog(`✨ [Skill] 触发技能: ${fn.name} , 参数: ${JSON.stringify(args)}`);
+                  
+                  let result: any = { status: "success" };
+                  
+                  if (fn.name === 'remember_fact') {
+                    setMemories(prev => [...prev, args.fact]);
+                  } else if (fn.name === 'get_current_time') {
+                    result = { time: new Date().toLocaleString() };
+                  }
+
+                  // 响应 Tool Call
+                  if (sessionRef.current) {
+                    sessionRef.current.then((session: any) => {
+                      if (typeof session.send === 'function') {
+                        session.send({
+                          toolResponse: {
+                            functionResponses: [{
+                              id: fn.id || "",
+                              name: fn.name,
+                              response: result
+                            }]
+                          }
+                        });
+                      }
+                    });
+                  }
+                }
+
                 if (part.inlineData && part.inlineData.data) {
                   const base64Audio = part.inlineData.data;
                   if (pcmPlayerRef.current) {
@@ -166,8 +198,28 @@ export default function App() {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
           },
-          // 注入系统指令 (根据选择的角色)
-          systemInstruction: systemPromptRef.current,
+          // 注入系统指令 (含动态记忆)
+          systemInstruction: systemPromptRef.current + (memories.length > 0 ? "\n\n当前用户的核心记忆（请在对话中自然参考这些信息）：\n" + memories.map((m,i)=>`${i+1}. ${m}`).join('\n') : ""),
+          // 技能/工具声明
+          tools: [
+            {
+              functionDeclarations: [
+                {
+                  name: "remember_fact",
+                  description: "Skill 记忆能力：提取并持久化保存用户的重要事实（例如身份、偏好、习惯或正在做的关键事情），以此作为你的“长期记忆”。如果用户提到“记住我是xx”或“以后叫我xx”，调用此技能。",
+                  parameters: {
+                    type: "OBJECT",
+                    properties: { fact: { type: "STRING", description: "需要保存的精简事实，如'用户今天在复习数学'" } },
+                    required: ["fact"]
+                  }
+                },
+                {
+                  name: "get_current_time",
+                  description: "Skill 时间感知能力：获取当前的本地系统时间。",
+                }
+              ]
+            }
+          ]
         },
       });
       
@@ -480,6 +532,27 @@ export default function App() {
                 API Key 已通过环境变量 (VITE_GEMINI_API_KEY) 安全注入，无需手动输入。
               </p>
             </div>
+          </div>
+
+          {/* 记忆与技能面板 */}
+          <div className="bg-zinc-900/50 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
+            <h2 className="text-sm font-semibold mb-3 text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-400" />
+              上下文记忆 (Memory)
+            </h2>
+            {memories.length === 0 ? (
+              <p className="text-xs text-zinc-500 italic bg-black/20 p-3 rounded-lg border border-white/5">
+                在这个对话中你还没有专属记忆。你可以对 AI 说：“记住我现在正在学前端”，看看它的反应。
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {memories.map((m, i) => (
+                  <li key={i} className="text-xs text-zinc-300 bg-black/30 p-2.5 rounded-lg border border-emerald-500/10 flex items-start gap-2 leading-relaxed">
+                    <span className="text-emerald-500 font-mono mt-0.5">#{i+1}</span> {m}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* 日志面板 */}

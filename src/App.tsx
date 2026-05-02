@@ -123,40 +123,52 @@ export default function App() {
           },
           onmessage: async (message: LiveServerMessage) => {
             // 处理 Tool Call / Function Call (Skills 表现)
-            const serverContent = message.serverContent;
-            if (serverContent?.modelTurn?.parts) {
-              for (const part of serverContent.modelTurn.parts) {
-                if (part.functionCall) {
-                  const fn = part.functionCall as any;
-                  const args = fn.args || {};
-                  addLog(`✨ [Skill] 触发技能: ${fn.name} , 参数: ${JSON.stringify(args)}`);
-                  
-                  let result: any = { status: "success" };
-                  
-                  if (fn.name === 'remember_fact') {
-                    setMemories(prev => [...prev, args.fact]);
-                  } else if (fn.name === 'get_current_time') {
-                    result = { time: new Date().toLocaleString() };
-                  }
+            if (message.toolCall?.functionCalls) {
+              const responses = [];
+              for (const fn of message.toolCall.functionCalls) {
+                const args = fn.args || {};
+                addLog(`✨ [Skill] 触发技能: ${fn.name} , 参数: ${JSON.stringify(args)}`);
+                
+                let result: any = { status: "success" };
+                
+                if (fn.name === 'remember_fact') {
+                  setMemories(prev => {
+                    if (!prev.includes(args.fact)) {
+                      return [...prev, args.fact];
+                    }
+                    return prev;
+                  });
+                } else if (fn.name === 'get_current_time') {
+                  result = { time: new Date().toLocaleString() };
+                }
 
-                  // 响应 Tool Call
-                  if (sessionRef.current) {
-                    sessionRef.current.then((session: any) => {
-                      if (typeof session.send === 'function') {
-                        session.send({
-                          toolResponse: {
-                            functionResponses: [{
-                              id: fn.id || "",
-                              name: fn.name,
-                              response: result
-                            }]
-                          }
-                        });
+                responses.push({
+                  id: fn.id || "",
+                  name: fn.name,
+                  response: result
+                });
+              }
+
+              if (responses.length > 0 && sessionRef.current) {
+                sessionRef.current.then((session: any) => {
+                  if (typeof session.sendToolResponse === 'function') {
+                    session.sendToolResponse({
+                      functionResponses: responses
+                    });
+                  } else if (typeof session.send === 'function') {
+                    session.send({
+                      toolResponse: {
+                        functionResponses: responses
                       }
                     });
                   }
-                }
+                });
+              }
+            }
 
+            const serverContent = message.serverContent;
+            if (serverContent?.modelTurn?.parts) {
+              for (const part of serverContent.modelTurn.parts) {
                 if (part.inlineData && part.inlineData.data) {
                   const base64Audio = part.inlineData.data;
                   if (pcmPlayerRef.current) {

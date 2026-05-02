@@ -21,6 +21,7 @@
 - **自定义 AI 角色 (Persona)：** 用户可以在不同场景下随时切换 AI 扮演的角色，例如默认的副驾助手，或者是资深的代码向导。
 - **上下文动态记忆 (Memory)：** AI 能够通过调用内部 Skill 记住你们对话中提及的关键事实与偏好信息，并在面板中可视化呈现。
 - **动态技能中心 (Skill Hub)：** 内置标准工具调用（如获取当前系统时间）外，还允许你在界面上随时添加配置第三方 webhook（例如 Clawhub 共享节点），使 AI 具备联动外部任意系统 API 的能力！
+- **用户认证与后台审核：** 完善的 JWT 身份认证体系。内置用户审核机制（Admin 主动核准），用于安全地分享您的 AI 额度，避免 API Key 被恶意调用。
 - **平滑的音频系统：** 纯前端实现的 AudioWorklet 录音与自定义 PCMPlayer，处理底层音频采集和播放重采样。
 - **现代化 UI：** 使用 Tailwind CSS 构建，极致的暗黑风格界面，包含实时的系统日志控制面板和语音活动波形反馈。
 
@@ -28,8 +29,10 @@
 
 - **前端框架：** React 19 + TypeScript + Vite
 - **UI & 样式：** Tailwind CSS + Lucide React (图标)
+- **后端 API：** Hono.js + Cloudflare D1 (生产环境) / better-sqlite3 (本地环境)
+- **安全体系：** JWT (jose) + bcryptjs
 - **AI 模型集成：** `@google/genai` (基于 `gemini-3.1-flash-live-preview`)
-- **部署环境：** 完美适配 Cloudflare Pages 静态/全栈部署结构
+- **部署环境：** 完美适配 Cloudflare Pages 全栈部署结构
 
 ## 🚀 本地开发与运行指南
 
@@ -43,11 +46,13 @@ npm install
 
 ### 2. 配置环境变量
 
-在项目根目录创建一个 `.env` 文件，并填入以下参数。你需要准备一个有权限的 Google Gemini API Key：
+在项目根目录创建一个 `.env` 文件，填入安全秘钥与 Gemini API Key。对于本地，服务会自动生成 sqlite 数据文件。
 
 ```env
 # Gemini API Key (推荐使用具有 Live API 权限的模型)
 VITE_GEMINI_API_KEY=your_gemini_api_key_here
+# JWT Secret Key
+JWT_SECRET=your_super_secret_jwt_key
 ```
 
 ### 3. 启动开发服务器
@@ -57,10 +62,13 @@ npm run dev
 ```
 
 打开浏览器访问输出的本地地址（默认 `http://localhost:3000`）。
+首次运行后注册一个账号，若你需要成为管理员，用户名请固定使用 `admin` 注册，注册后会自动获得审核后台的管理入口与免审核权限。
 
 ### 4. 部署至 Cloudflare Pages
 
-本项目支持直接发布到 Cloudflare Pages 环境中。执行编译并将 `dist` 目录发布（需全局配置 Wrangler 并登录）：
+本项目是 Cloudflare Pages 全栈项目。包含前后台代码组合。
+发布前需要你在 Cloudflare 控制台创建 D1 实例，并在 `wrangler.toml` (如有) 中绑定对应的 `DB`。
+编译并将生产结构部署至 Pages:
 
 ```bash
 npm run build

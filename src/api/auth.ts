@@ -26,7 +26,8 @@ authApp.post('/register', async (c) => {
   const now = Date.now();
 
   try {
-    await query(c.env, 'INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)', [id, username, passwordHash, now]);
+    const isApproved = username === 'admin' ? 1 : 0;
+    await query(c.env, 'INSERT INTO users (id, username, password_hash, created_at, is_approved) VALUES (?, ?, ?, ?, ?)', [id, username, passwordHash, now, isApproved]);
     
     // Generate JWT
     const token = await new SignJWT({ id, username })
@@ -35,7 +36,7 @@ authApp.post('/register', async (c) => {
       .setExpirationTime('30d')
       .sign(getSecretKey(c.env));
 
-    return c.json({ token, user: { id, username } });
+    return c.json({ token, user: { id, username, is_approved: isApproved } });
   } catch (err) {
     return c.json({ error: 'Failed to register user' }, 500);
   }
@@ -64,7 +65,7 @@ authApp.post('/login', async (c) => {
     .setExpirationTime('30d')
     .sign(getSecretKey(c.env));
 
-  return c.json({ token, user: { id: user.id, username: user.username } });
+  return c.json({ token, user: { id: user.id, username: user.username, is_approved: user.is_approved } });
 });
 
 authApp.get('/me', async (c) => {
@@ -76,7 +77,8 @@ authApp.get('/me', async (c) => {
   const token = authHeader.split(' ')[1];
   try {
     const { payload } = await jwtVerify(token, getSecretKey(c.env));
-    return c.json({ user: { id: payload.id, username: payload.username } });
+    const user: any = await queryFirst(c.env, 'SELECT is_approved FROM users WHERE id = ?', [payload.id]);
+    return c.json({ user: { id: payload.id, username: payload.username, is_approved: user ? user.is_approved : 0 } });
   } catch (err) {
     return c.json({ error: 'Invalid token' }, 401);
   }

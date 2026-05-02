@@ -30,10 +30,12 @@ export const query = async (env: any, sql: string, params: any[] = []) => {
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE,
         password_hash TEXT,
-        created_at INTEGER
+        created_at INTEGER,
+        is_approved INTEGER DEFAULT 0
       );
     `);
-
+    try { db.exec('ALTER TABLE users ADD COLUMN is_approved INTEGER DEFAULT 0'); } catch(e) {}
+    
     const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
     if (isSelect) {
         const stmt = db.prepare(sql);

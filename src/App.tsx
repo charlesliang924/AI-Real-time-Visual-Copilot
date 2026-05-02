@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
-import { Mic, MicOff, MonitorUp, MonitorOff, Play, Square, Activity, Terminal, LogOut, Loader2 } from 'lucide-react';
+import { Mic, MicOff, MonitorUp, MonitorOff, Play, Square, Activity, Terminal, LogOut, Loader2, ShieldCheck, Clock } from 'lucide-react';
 import { AudioRecorder, PCMPlayer } from './lib/audio';
 import Auth from './components/Auth';
 import { PersonaSelector, defaultPersonas } from './components/PersonaSelector';
+import AdminPanel from './components/AdminPanel';
 
 export interface CustomSkill {
   id: string;
@@ -13,7 +14,8 @@ export interface CustomSkill {
 }
 
 export default function App() {
-  const [user, setUser] = useState<{ id: string, username: string } | null>(null);
+  const [user, setUser] = useState<{ id: string, username: string, is_approved: number } | null>(null);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -112,15 +114,22 @@ export default function App() {
 
       if (!apiKey) {
         try {
-          const resp = await fetch('/api/config');
+          const token = localStorage.getItem('token');
+          const resp = await fetch('/api/config', {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          });
           if (resp.ok) {
             const data = await resp.json();
             if (data.geminiApiKey) {
               apiKey = data.geminiApiKey;
             }
+          } else {
+            const errorData = await resp.json().catch(()=>({}));
+            throw new Error(errorData.error || `Failed to fetch API config (${resp.status})`);
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Failed to fetch API key from server", err);
+          throw new Error(err.message || "Failed to fetch config");
         }
       }
 
@@ -462,6 +471,39 @@ export default function App() {
     return <Auth onLogin={setUser} />;
   }
 
+  if (showAdmin && user.username === 'admin') {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] text-gray-100 font-sans p-6">
+        <div className="max-w-4xl mx-auto">
+          <AdminPanel onBack={() => setShowAdmin(false)} />
+        </div>
+      </div>
+    );
+  }
+
+  if (user.is_approved !== 1) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] text-gray-100 font-sans flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-zinc-900 border border-amber-500/20 rounded-2xl p-8 text-center shadow-2xl">
+          <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Clock className="w-8 h-8 text-amber-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-3">账号审核中</h2>
+          <p className="text-zinc-400 mb-8 leading-relaxed">
+            为了控制 API 成本并确保系统质量，您的账号目前正处于等待管理员审核的状态。<br/>审核通过后即可体验完整的 AI 视觉副驾功能。
+          </p>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition mx-auto"
+          >
+            <LogOut className="w-4 h-4" />
+            退出登录
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-gray-100 font-sans selection:bg-indigo-500/30">
       {/* 隐藏的 Canvas 用于截图 */}
@@ -500,6 +542,17 @@ export default function App() {
                 }} 
               />
               
+              {user.username === 'admin' && (
+                <button
+                  onClick={() => setShowAdmin(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20 transition-all"
+                  title="管理后台"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  审核管理
+                </button>
+              )}
+
               <button
                 onClick={handleSignOut}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-all"

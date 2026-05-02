@@ -4,5 +4,5 @@ pages_build_output_dir = "dist"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "ai-copilot-db"
-database_id = "xxxx-xxxx-xxxx-xxxx" # Replace with your real DB ID when provisioning on Cloudflare
+database_name = "cobot_db"
+database_id = "2453bb1e-40d5-4dcf-8127-83d09590e423" # Replace with your real DB ID when provisioning on Cloudflare

@@ -1,27 +1,5 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-let localDb: any = null;
-
-const getLocalDb = () => {
-  if (!localDb) {
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const dbPath = path.join(__dirname, '../../local.sqlite');
-    localDb = new Database(dbPath);
-    
-    // Initialize schema
-    localDb.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT UNIQUE,
-        password_hash TEXT,
-        created_at INTEGER
-      );
-    `);
-  }
-  return localDb;
-};
+// This file handles both local dev (better-sqlite3) and Cloudflare Pages (D1)
+// We use dynamic imports for native Node modules so Cloudflare's bundler doesn't fail.
 
 export const query = async (env: any, sql: string, params: any[] = []) => {
   if (env && env.DB) {
@@ -35,7 +13,27 @@ export const query = async (env: any, sql: string, params: any[] = []) => {
     return results;
   } else {
     // Local better-sqlite3
-    const db = getLocalDb();
+    const dbNames = {
+      sqlite: 'better-sqlite3',
+      path: 'path',
+      url: 'url'
+    };
+    const path = await import(/* @vite-ignore */ dbNames.path);
+    const url = await import(/* @vite-ignore */ dbNames.url);
+    const Database = (await import(/* @vite-ignore */ dbNames.sqlite)).default;
+
+    const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+    const dbPath = path.join(__dirname, '../../local.sqlite');
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE,
+        password_hash TEXT,
+        created_at INTEGER
+      );
+    `);
+
     const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
     if (isSelect) {
         const stmt = db.prepare(sql);

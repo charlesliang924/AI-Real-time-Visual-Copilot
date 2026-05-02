@@ -21,8 +21,14 @@ authApp.post('/register', async (c) => {
     return c.json({ error: 'Username already exists' }, 400);
   }
 
-  const id = crypto.randomUUID();
-  const passwordHash = await bcrypt.hash(password, 10);
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
+  
+  let passwordHash;
+  try {
+    passwordHash = await bcrypt.hash(password, 10);
+  } catch (err) {
+    passwordHash = bcrypt.hashSync(password, 10);
+  }
   const now = Date.now();
 
   try {
@@ -37,8 +43,9 @@ authApp.post('/register', async (c) => {
       .sign(getSecretKey(c.env));
 
     return c.json({ token, user: { id, username, is_approved: isApproved } });
-  } catch (err) {
-    return c.json({ error: 'Failed to register user' }, 500);
+  } catch (err: any) {
+    console.error("Register Error: ", err);
+    return c.json({ error: 'Failed to register user: ' + err.message }, 500);
   }
 });
 

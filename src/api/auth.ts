@@ -21,19 +21,12 @@ authApp.post('/register', async (c) => {
     return c.json({ error: 'Username already exists' }, 400);
   }
 
-  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
-  
-  let passwordHash;
-  try {
-    passwordHash = await bcrypt.hash(password, 10);
-  } catch (err) {
-    passwordHash = bcrypt.hashSync(password, 10);
-  }
+  const id = crypto.randomUUID();
+  const passwordHash = await bcrypt.hash(password, 10);
   const now = Date.now();
 
   try {
-    const isApproved = username === 'admin' ? 1 : 0;
-    await query(c.env, 'INSERT INTO users (id, username, password_hash, created_at, is_approved) VALUES (?, ?, ?, ?, ?)', [id, username, passwordHash, now, isApproved]);
+    await query(c.env, 'INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)', [id, username, passwordHash, now]);
     
     // Generate JWT
     const token = await new SignJWT({ id, username })
@@ -42,10 +35,9 @@ authApp.post('/register', async (c) => {
       .setExpirationTime('30d')
       .sign(getSecretKey(c.env));
 
-    return c.json({ token, user: { id, username, is_approved: isApproved } });
-  } catch (err: any) {
-    console.error("Register Error: ", err);
-    return c.json({ error: 'Failed to register user: ' + err.message }, 500);
+    return c.json({ token, user: { id, username } });
+  } catch (err) {
+    return c.json({ error: 'Failed to register user' }, 500);
   }
 });
 
@@ -72,7 +64,7 @@ authApp.post('/login', async (c) => {
     .setExpirationTime('30d')
     .sign(getSecretKey(c.env));
 
-  return c.json({ token, user: { id: user.id, username: user.username, is_approved: user.is_approved } });
+  return c.json({ token, user: { id: user.id, username: user.username } });
 });
 
 authApp.get('/me', async (c) => {
@@ -84,8 +76,7 @@ authApp.get('/me', async (c) => {
   const token = authHeader.split(' ')[1];
   try {
     const { payload } = await jwtVerify(token, getSecretKey(c.env));
-    const user: any = await queryFirst(c.env, 'SELECT is_approved FROM users WHERE id = ?', [payload.id]);
-    return c.json({ user: { id: payload.id, username: payload.username, is_approved: user ? user.is_approved : 0 } });
+    return c.json({ user: { id: payload.id, username: payload.username } });
   } catch (err) {
     return c.json({ error: 'Invalid token' }, 401);
   }

@@ -1,30 +1,9 @@
 // This file handles both local dev (better-sqlite3) and Cloudflare Pages (D1)
 // We use dynamic imports for native Node modules so Cloudflare's bundler doesn't fail.
 
-let localDbCache: any = null;
-let d1Initialized = false;
-
 export const query = async (env: any, sql: string, params: any[] = []) => {
   if (env && env.DB) {
     // Cloudflare D1
-    if (!d1Initialized) {
-      d1Initialized = true;
-      try {
-        await env.DB.exec(`
-          CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            username TEXT UNIQUE,
-            password_hash TEXT,
-            created_at INTEGER,
-            is_approved INTEGER DEFAULT 0
-          );
-        `);
-      } catch(e) {}
-      try {
-        await env.DB.exec('ALTER TABLE users ADD COLUMN is_approved INTEGER DEFAULT 0;');
-      } catch(e) {}
-    }
-    
     const stmt = env.DB.prepare(sql);
     let binded = stmt;
     if (params.length > 0) {
@@ -34,36 +13,27 @@ export const query = async (env: any, sql: string, params: any[] = []) => {
     return results;
   } else {
     // Local better-sqlite3
-    if (!localDbCache) {
-      const dbNames = {
-        sqlite: 'better-sqlite3',
-        path: 'path',
-        url: 'url'
-      };
-      const path = await import(/* @vite-ignore */ dbNames.path);
-      const url = await import(/* @vite-ignore */ dbNames.url);
-      const Database = (await import(/* @vite-ignore */ dbNames.sqlite)).default;
+    const dbNames = {
+      sqlite: 'better-sqlite3',
+      path: 'path',
+      url: 'url'
+    };
+    const path = await import(/* @vite-ignore */ dbNames.path);
+    const url = await import(/* @vite-ignore */ dbNames.url);
+    const Database = (await import(/* @vite-ignore */ dbNames.sqlite)).default;
 
-      const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-      const dbPath = path.join(__dirname, '../../local.sqlite');
-      localDbCache = new Database(dbPath);
-      localDbCache.exec(`
-        CREATE TABLE IF NOT EXISTS users (
-          id TEXT PRIMARY KEY,
-          username TEXT UNIQUE,
-          password_hash TEXT,
-          created_at INTEGER,
-          is_approved INTEGER DEFAULT 0
-        );
-      `);
-      try { 
-        localDbCache.exec('ALTER TABLE users ADD COLUMN is_approved INTEGER DEFAULT 0'); 
-      } catch(e) {
-        // console.log('ALTER TABLE info:', e);
-      }
-    }
-    
-    const db = localDbCache;
+    const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+    const dbPath = path.join(__dirname, '../../local.sqlite');
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE,
+        password_hash TEXT,
+        created_at INTEGER
+      );
+    `);
+
     const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
     if (isSelect) {
         const stmt = db.prepare(sql);

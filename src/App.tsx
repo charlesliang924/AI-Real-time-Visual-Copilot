@@ -1,21 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
-import { Mic, MicOff, MonitorUp, MonitorOff, Play, Square, Activity, Terminal, LogOut, Loader2, ShieldCheck, Clock } from 'lucide-react';
+import { GoogleGenAI, LiveServerMessage, Modality, Type } from "@google/genai";
+import { Mic, MicOff, MonitorUp, MonitorOff, Play, Square, Activity, Terminal, LogOut, Loader2 } from 'lucide-react';
 import { AudioRecorder, PCMPlayer } from './lib/audio';
 import Auth from './components/Auth';
 import { PersonaSelector, defaultPersonas } from './components/PersonaSelector';
-import AdminPanel from './components/AdminPanel';
-
-export interface CustomSkill {
-  id: string;
-  name: string;
-  description: string;
-  endpoint: string;
-}
 
 export default function App() {
-  const [user, setUser] = useState<{ id: string, username: string, is_approved: number } | null>(null);
-  const [showAdmin, setShowAdmin] = useState(false);
+  const [user, setUser] = useState<{ id: string, username: string } | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -27,22 +18,7 @@ export default function App() {
   const [noiseThreshold, setNoiseThreshold] = useState(0.005);
   const noiseThresholdRef = useRef(0.005);
   const [logs, setLogs] = useState<string[]>([]);
-  const [customSkills, setCustomSkills] = useState<CustomSkill[]>([]);
-  const customSkillsRef = useRef<CustomSkill[]>([]);
-  const [showSkillModal, setShowSkillModal] = useState(false);
-  const [newSkill, setNewSkill] = useState<CustomSkill>({ id: '', name: '', description: '', endpoint: '' });
   
-  useEffect(() => {
-    const saved = localStorage.getItem('customSkills');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setCustomSkills(parsed);
-        customSkillsRef.current = parsed;
-      } catch(e) {}
-    }
-  }, []);
-
   useEffect(() => {
     noiseThresholdRef.current = noiseThreshold;
   }, [noiseThreshold]);
@@ -105,7 +81,8 @@ export default function App() {
       addLog('正在连接 Gemini Live API...');
       pcmPlayerRef.current = new PCMPlayer();
       
-      let apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+      // @ts-ignore
+      let apiKey = import.meta.env?.VITE_GEMINI_API_KEY || '';
       // @ts-ignore
       if (!apiKey && typeof process !== 'undefined' && process.env.GEMINI_API_KEY) {
         // @ts-ignore
@@ -114,22 +91,15 @@ export default function App() {
 
       if (!apiKey) {
         try {
-          const token = localStorage.getItem('token');
-          const resp = await fetch('/api/config', {
-            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-          });
+          const resp = await fetch('/api/config');
           if (resp.ok) {
             const data = await resp.json();
             if (data.geminiApiKey) {
               apiKey = data.geminiApiKey;
             }
-          } else {
-            const errorData = await resp.json().catch(()=>({}));
-            throw new Error(errorData.error || `Failed to fetch API config (${resp.status})`);
           }
-        } catch (err: any) {
+        } catch (err) {
           console.error("Failed to fetch API key from server", err);
-          throw new Error(err.message || "Failed to fetch config");
         }
       }
 
@@ -154,84 +124,40 @@ export default function App() {
           },
           onmessage: async (message: LiveServerMessage) => {
             // 处理 Tool Call / Function Call (Skills 表现)
-            if (message.toolCall?.functionCalls) {
-              const responses = [];
-              for (const fn of message.toolCall.functionCalls) {
-                const args = fn.args || {};
-                addLog(`✨ [Skill] 触发技能: ${fn.name} , 参数: ${JSON.stringify(args)}`);
-                
-                let result: any = { status: "success" };
-                
-                if (fn.name === 'remember_fact') {
-                  setMemories(prev => {
-                    if (!prev.includes(args.fact)) {
-                      return [...prev, args.fact];
-                    }
-                    return prev;
-                  });
-                } else if (fn.name === 'get_current_time') {
-                  result = { time: new Date().toLocaleString() };
-                } else {
-                  // Check custom skills
-                  const customSkill = customSkillsRef.current.find(s => s.name === fn.name);
-                  if (customSkill) {
-                    try {
-                      addLog(`🌐 请求外部技能端点: ${customSkill.endpoint}`);
-                      const res = await fetch(customSkill.endpoint, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(args)
-                      });
-                      if (res.ok) {
-                        result = await res.json();
-                      } else {
-                        result = { error: `HTTP ${res.status}: ${await res.text()}` };
-                      }
-                    } catch (e: any) {
-                      result = { error: e.message || 'Unknown error calling endpoint' };
-                    }
-                  }
-                }
-
-                responses.push({
-                  id: fn.id || "",
-                  name: fn.name,
-                  response: result
-                });
-              }
-
-              if (responses.length > 0 && sessionRef.current) {
-                sessionRef.current.then((session: any) => {
-                  if (typeof session.sendToolResponse === 'function') {
-                    session.sendToolResponse({
-                      functionResponses: responses
-                    });
-                  } else if (typeof session.send === 'function') {
-                    session.send({
-                      toolResponse: {
-                        functionResponses: responses
-                      }
-                    });
-                  }
-                  // Force AI to generate the next response explicitly
-                  if (typeof session.send === 'function') {
-                    session.send({
-                      clientContent: {
-                        turns: [{
-                          role: "user",
-                          parts: [{ text: "我已经执行了技能，请结合结果进行回答。" }]
-                        }],
-                        turnComplete: true
-                      }
-                    });
-                  }
-                });
-              }
-            }
-
             const serverContent = message.serverContent;
             if (serverContent?.modelTurn?.parts) {
               for (const part of serverContent.modelTurn.parts) {
+                if (part.functionCall) {
+                  const fn = part.functionCall as any;
+                  const args = fn.args || {};
+                  addLog(`✨ [Skill] 触发技能: ${fn.name} , 参数: ${JSON.stringify(args)}`);
+                  
+                  let result: any = { status: "success" };
+                  
+                  if (fn.name === 'remember_fact') {
+                    setMemories(prev => [...prev, args.fact]);
+                  } else if (fn.name === 'get_current_time') {
+                    result = { time: new Date().toLocaleString() };
+                  }
+
+                  // 响应 Tool Call
+                  if (sessionRef.current) {
+                    sessionRef.current.then((session: any) => {
+                      if (typeof session.send === 'function') {
+                        session.send({
+                          toolResponse: {
+                            functionResponses: [{
+                              id: fn.id || "",
+                              name: fn.name,
+                              response: result
+                            }]
+                          }
+                        });
+                      }
+                    });
+                  }
+                }
+
                 if (part.inlineData && part.inlineData.data) {
                   const base64Audio = part.inlineData.data;
                   if (pcmPlayerRef.current) {
@@ -283,27 +209,18 @@ export default function App() {
                   name: "remember_fact",
                   description: "Skill 记忆能力：提取并持久化保存用户的重要事实（例如身份、偏好、习惯或正在做的关键事情），以此作为你的“长期记忆”。如果用户提到“记住我是xx”或“以后叫我xx”，调用此技能。",
                   parameters: {
-                    type: "OBJECT",
-                    properties: { fact: { type: "STRING", description: "需要保存的精简事实，如'用户今天在复习数学'" } },
+                    type: Type.OBJECT,
+                    properties: { fact: { type: Type.STRING, description: "需要保存的精简事实，如'用户今天在复习数学'" } },
                     required: ["fact"]
                   }
                 },
                 {
                   name: "get_current_time",
                   description: "Skill 时间感知能力：获取当前的本地系统时间。",
-                },
-                ...customSkillsRef.current.map(skill => ({
-                  name: skill.name,
-                  description: skill.description,
-                  parameters: {
-                    type: "OBJECT",
-                    properties: {
-                      payload: { type: "STRING", description: "JSON arguments for the request." }
-                    }
-                  }
-                }))
+                }
               ]
-            }
+            },
+            { googleSearch: {} }
           ]
         },
       });
@@ -471,39 +388,6 @@ export default function App() {
     return <Auth onLogin={setUser} />;
   }
 
-  if (showAdmin && user.username === 'admin') {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] text-gray-100 font-sans p-6">
-        <div className="max-w-4xl mx-auto">
-          <AdminPanel onBack={() => setShowAdmin(false)} />
-        </div>
-      </div>
-    );
-  }
-
-  if (user.is_approved !== 1) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] text-gray-100 font-sans flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-zinc-900 border border-amber-500/20 rounded-2xl p-8 text-center shadow-2xl">
-          <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Clock className="w-8 h-8 text-amber-500" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-3">账号审核中</h2>
-          <p className="text-zinc-400 mb-8 leading-relaxed">
-            为了控制 API 成本并确保系统质量，您的账号目前正处于等待管理员审核的状态。<br/>审核通过后即可体验完整的 AI 视觉副驾功能。
-          </p>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition mx-auto"
-          >
-            <LogOut className="w-4 h-4" />
-            退出登录
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-gray-100 font-sans selection:bg-indigo-500/30">
       {/* 隐藏的 Canvas 用于截图 */}
@@ -542,17 +426,6 @@ export default function App() {
                 }} 
               />
               
-              {user.username === 'admin' && (
-                <button
-                  onClick={() => setShowAdmin(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20 transition-all"
-                  title="管理后台"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  审核管理
-                </button>
-              )}
-
               <button
                 onClick={handleSignOut}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-all"
@@ -665,18 +538,16 @@ export default function App() {
 
           {/* 记忆与技能面板 */}
           <div className="bg-zinc-900/50 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                <Activity className="w-4 h-4 text-emerald-400" />
-                上下文记忆 (Memory)
-              </h2>
-            </div>
+            <h2 className="text-sm font-semibold mb-3 text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-400" />
+              上下文记忆 (Memory)
+            </h2>
             {memories.length === 0 ? (
               <p className="text-xs text-zinc-500 italic bg-black/20 p-3 rounded-lg border border-white/5">
                 在这个对话中你还没有专属记忆。你可以对 AI 说：“记住我现在正在学前端”，看看它的反应。
               </p>
             ) : (
-              <ul className="space-y-2 mb-4">
+              <ul className="space-y-2">
                 {memories.map((m, i) => (
                   <li key={i} className="text-xs text-zinc-300 bg-black/30 p-2.5 rounded-lg border border-emerald-500/10 flex items-start gap-2 leading-relaxed">
                     <span className="text-emerald-500 font-mono mt-0.5">#{i+1}</span> {m}
@@ -684,49 +555,6 @@ export default function App() {
                 ))}
               </ul>
             )}
-
-            <div className="mt-6 pt-6 border-t border-white/5">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                  <Terminal className="w-4 h-4 text-purple-400" />
-                  动态技能中心 (Skill Hub)
-                </h2>
-                <button 
-                  onClick={() => setShowSkillModal(true)}
-                  className="text-xs bg-purple-500/20 text-purple-300 px-2.5 py-1 rounded-md hover:bg-purple-500/30 transition-colors"
-                >
-                  + 添加 (如 Clawhub 插件)
-                </button>
-              </div>
-
-              {customSkills.length === 0 ? (
-                <p className="text-xs text-zinc-500 italic bg-black/20 p-3 rounded-lg border border-white/5">
-                  连接社区，支持标准 API 插件。点击添加绑定外部能力。
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {customSkills.map((s) => (
-                    <li key={s.id} className="text-xs text-zinc-300 bg-black/30 p-2.5 rounded-lg border border-purple-500/10 flex items-start justify-between gap-2">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-purple-400">{s.name}</span>
-                        <span className="text-zinc-500 line-clamp-1">{s.description}</span>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          const newer = customSkills.filter(x => x.id !== s.id);
-                          setCustomSkills(newer);
-                          customSkillsRef.current = newer;
-                          localStorage.setItem('customSkills', JSON.stringify(newer));
-                        }}
-                        className="text-red-400/50 hover:text-red-400"
-                      >
-                        ✕
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
           </div>
 
           {/* 日志面板 */}
@@ -749,72 +577,6 @@ export default function App() {
           
         </div>
       </div>
-
-      {/* Skill Modal */}
-      {showSkillModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-md p-6">
-            <h3 className="text-lg font-medium text-white mb-4">添加自定义大模型技能</h3>
-            <p className="text-sm text-zinc-400 mb-6">连接任何支持 MCP 或标准 webhook 回调的接口 (例如 Clawhub 的远程 API 节点)</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-zinc-500 mb-1">技能名称 (仅支持英文和下划线)</label>
-                <input
-                  type="text"
-                  value={newSkill.name}
-                  onChange={e => setNewSkill({...newSkill, name: e.target.value.replace(/[^a-zA-Z_]/g, '')})}
-                  placeholder="e.g. search_github_repo"
-                  className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-500 mb-1">给大模型的技能语境描述</label>
-                <textarea
-                  value={newSkill.description}
-                  onChange={e => setNewSkill({...newSkill, description: e.target.value})}
-                  placeholder="e.g. 这个技能能够让你调用 Github API..."
-                  rows={3}
-                  className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-500 mb-1">API Endpoint (POST Webhook)</label>
-                <input
-                  type="url"
-                  value={newSkill.endpoint}
-                  onChange={e => setNewSkill({...newSkill, endpoint: e.target.value})}
-                  placeholder="https://api.clawhub.com/run/..."
-                  className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 mt-8">
-              <button
-                onClick={() => setShowSkillModal(false)}
-                className="px-4 py-2 text-sm text-zinc-400 hover:text-white"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  if(!newSkill.name || !newSkill.endpoint || !newSkill.description) return;
-                  const finalSkill = { ...newSkill, id: Date.now().toString() };
-                  const newer = [...customSkills, finalSkill];
-                  setCustomSkills(newer);
-                  customSkillsRef.current = newer;
-                  localStorage.setItem('customSkills', JSON.stringify(newer));
-                  setNewSkill({ id: '', name: '', description: '', endpoint: '' });
-                  setShowSkillModal(false);
-                }}
-                className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                disabled={!newSkill.name || !newSkill.endpoint || !newSkill.description}
-              >
-                保存技能
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

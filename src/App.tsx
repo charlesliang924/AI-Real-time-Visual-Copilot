@@ -118,7 +118,7 @@ export default function App() {
             // 发送一条初始文本消息，让 AI 主动打招呼，提供连接成功的语音反馈
             if (sessionRef.current) {
               sessionRef.current.then((session: any) => {
-                session.sendRealtimeInput({ text: "你好！我已经连接成功了，请用简短、热情的一句话和我打个招呼，告诉我你已经准备好做我的视觉副驾了。" });
+                session.sendClientContent({ turns: ["你好！我已经连接成功了，请用简短、热情的一句话和我打个招呼，告诉我你已经准备好做我的视觉副驾了。"], turnComplete: true });
               });
             }
           },
@@ -143,15 +143,13 @@ export default function App() {
                   // 响应 Tool Call
                   if (sessionRef.current) {
                     sessionRef.current.then((session: any) => {
-                      if (typeof session.send === 'function') {
-                        session.send({
-                          toolResponse: {
-                            functionResponses: [{
-                              id: fn.id || "",
-                              name: fn.name,
-                              response: result
-                            }]
-                          }
+                      if (typeof session.sendToolResponse === 'function') {
+                        session.sendToolResponse({
+                          functionResponses: [{
+                            id: fn.id || "",
+                            name: fn.name,
+                            response: result
+                          }]
                         });
                       }
                     });
@@ -221,7 +219,9 @@ export default function App() {
               ]
             },
             { googleSearch: {} }
-          ]
+          ],
+          // @ts-ignore
+          toolConfig: { includeServerSideToolInvocations: true }
         },
       });
       

@@ -115,12 +115,6 @@ export default function App() {
           onopen: () => {
             addLog('WebSocket 连接成功！');
             setIsConnected(true);
-            // 发送一条初始文本消息，让 AI 主动打招呼，提供连接成功的语音反馈
-            if (sessionRef.current) {
-              sessionRef.current.then((session: any) => {
-                session.sendClientContent({ turns: ["你好！我已经连接成功了，请用简短、热情的一句话和我打个招呼，告诉我你已经准备好做我的视觉副驾了。"], turnComplete: true });
-              });
-            }
           },
           onmessage: async (message: LiveServerMessage) => {
             // 处理 Tool Call / Function Call (Skills 表现)
@@ -138,6 +132,10 @@ export default function App() {
                     setMemories(prev => [...prev, args.fact]);
                   } else if (fn.name === 'get_current_time') {
                     result = { time: new Date().toLocaleString() };
+                  } else if (fn.name === 'search_internet') {
+                    addLog(`正在执行联网搜索: ${args.query}`);
+                    // 模拟搜索结果，实际应用中可以调用真实的搜索引擎 API
+                    result = { results: [`[搜索结果] 关于 "${args.query}" 的信息：这是通过模拟联网搜索得到的结果，表明目前系统已接通自定义搜索能力。`] };
                   }
 
                   // 响应 Tool Call
@@ -184,8 +182,8 @@ export default function App() {
               }
             }
           },
-          onclose: () => {
-            addLog('WebSocket 连接已关闭');
+          onclose: (ev) => {
+            addLog(`WebSocket 连接已关闭 (Reason: ${ev?.reason || 'Unknown'}, Code: ${ev?.code || 'Unknown'})`);
             disconnectAI();
           },
           onerror: (err) => {
@@ -215,13 +213,19 @@ export default function App() {
                 {
                   name: "get_current_time",
                   description: "Skill 时间感知能力：获取当前的本地系统时间。",
+                },
+                {
+                  name: "search_internet",
+                  description: "Skill 联网搜索能力：如果你需要最新的联网信息，调用此技能进行搜索",
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: { query: { type: Type.STRING, description: "搜索关键词" } },
+                    required: ["query"]
+                  }
                 }
               ]
-            },
-            { googleSearch: {} }
-          ],
-          // @ts-ignore
-          toolConfig: { includeServerSideToolInvocations: true }
+            }
+          ]
         },
       });
       

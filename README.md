@@ -18,7 +18,10 @@
 
 - **真正的实时多模态交互：** 结合 WebRTC 屏幕采集与 PCM 音频流，以 WebSocket 与 Gemini Live 建立全双工连接。
 - **智能“防打断”机制 (客户端 VAD)：** 内置自适应噪音门限（Noise Gate），配有可视化的“收音阈值”调节滑块。完美过滤键盘敲击声、风扇声等背景噪音，彻底解决由于环境噪音导致 AI 语音频繁被打断的痛点。
-- **安全可靠的用户体系：** 深度集成 Firebase Phone Authentication，支持使用手机号接收短信验证码注册登录，结合 Invisible reCAPTCHA 防止滥用，用户数据安全存储在 Firestore。
+- **自定义 AI 角色 (Persona)：** 用户可以在不同场景下随时切换 AI 扮演的角色，例如默认的副驾助手，或者是资深的代码向导。
+- **上下文动态记忆 (Memory)：** AI 能够通过调用内部 Skill 记住你们对话中提及的关键事实与偏好信息，并在面板中可视化呈现。
+- **动态技能中心 (Skill Hub)：** 内置标准工具调用（如获取当前系统时间）外，还允许你在界面上随时添加配置第三方 webhook（例如 Clawhub 共享节点），使 AI 具备联动外部任意系统 API 的能力！
+- **用户认证与后台审核：** 完善的 JWT 身份认证体系。内置用户审核机制（Admin 主动核准），用于安全地分享您的 AI 额度，避免 API Key 被恶意调用。
 - **平滑的音频系统：** 纯前端实现的 AudioWorklet 录音与自定义 PCMPlayer，处理底层音频采集和播放重采样。
 - **现代化 UI：** 使用 Tailwind CSS 构建，极致的暗黑风格界面，包含实时的系统日志控制面板和语音活动波形反馈。
 
@@ -26,9 +29,10 @@
 
 - **前端框架：** React 19 + TypeScript + Vite
 - **UI & 样式：** Tailwind CSS + Lucide React (图标)
+- **后端 API：** Hono.js + Cloudflare D1 (生产环境) / better-sqlite3 (本地环境)
+- **安全体系：** JWT (jose) + bcryptjs
 - **AI 模型集成：** `@google/genai` (基于 `gemini-3.1-flash-live-preview`)
-- **后端 / 身份认证：** Firebase (Auth + Firestore)
-- **多媒体处理：** Web Audio API (`AudioContext`, `AudioWorklet`) + MediaDevices API
+- **部署环境：** 完美适配 Cloudflare Pages 全栈部署结构
 
 ## 🚀 本地开发与运行指南
 
@@ -42,23 +46,14 @@ npm install
 
 ### 2. 配置环境变量
 
-在项目根目录创建一个 `.env` 文件，并填入以下参数。你需要准备一个有权限的 Google Gemini API Key，以及一个 Firebase Web 项目的配置：
+在项目根目录创建一个 `.env` 文件，填入安全秘钥与 Gemini API Key。对于本地，服务会自动生成 sqlite 数据文件。
 
 ```env
 # Gemini API Key (推荐使用具有 Live API 权限的模型)
 VITE_GEMINI_API_KEY=your_gemini_api_key_here
-
-# Firebase 配置
-VITE_FIREBASE_API_KEY=your_firebase_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-VITE_FIRESTORE_DATABASE_ID=(default)
+# JWT Secret Key
+JWT_SECRET=your_super_secret_jwt_key
 ```
-
-*(注意：由于 Firebase 电话认证的要求，请确保在 Firebase 控制台内开启了 Phone Auth，允许了你所在的国家短信区号，并在 Authorized domains 中添加了本地环境 `localhost` 开发域名)*
 
 ### 3. 启动开发服务器
 
@@ -67,15 +62,28 @@ npm run dev
 ```
 
 打开浏览器访问输出的本地地址（默认 `http://localhost:3000`）。
+首次运行后注册一个账号，若你需要成为管理员，用户名请固定使用 `admin` 注册，注册后会自动获得审核后台的管理入口与免审核权限。
+
+### 4. 部署至 Cloudflare Pages
+
+本项目是 Cloudflare Pages 全栈项目。包含前后台代码组合。
+发布前需要你在 Cloudflare 控制台创建 D1 实例，并在 `wrangler.toml` (如有) 中绑定对应的 `DB`。
+编译并将生产结构部署至 Pages:
+
+```bash
+npm run build
+npx wrangler pages deploy dist --project-name=ai-visual-copilot
+```
 
 ## 💡 使用说明
 
-1. **登录：** 输入手机号并获取验证码登录（第一次使用将会自动注册）。
-2. **连接 AI副驾：** 点击界面上的“连接 AI 副驾”按钮。当接收到 AI 的主动语音问候（“你好！...”）后，代表 WebSocket 通道已打通。
+1. **连接 AI副驾：** 点击界面上的“连接 AI 副驾”按钮。当接收到 AI 的主动语音问候（“你好！...”）后，代表 WebSocket 通道已打通。
+2. **切换角色：** 如果你需要 AI 在当前场景扮演“代码专家”一类的身份，可以在界面顶部直接选择不同角色。
 3. **开启全视界：** 点击“开启屏幕共享”，选择你要共享的桌面、窗口或浏览器标签页。
 4. **语音对话：** 点击“开启麦克风”。请注意观察麦克风界面的绿色音量跳动。
     - **进阶：调校收音阈值。** 如果你未说话时绿条也会跳动（说明有底噪），请微微调大下方的“收音阈值”进度条，直到环境噪音被过滤。这样 AI 就不会被键盘声打断了。
-5. **开始享受：** 一边操作你的软件/游戏，一边自然地向麦克风提问，让 AI 成为你的最强辅助！
+5. **体验智能记忆与技能：** 你可以对 AI 说“记住我是前端开发”，这会被记录到记忆面板；或者你可以添加类似于 Github API 的 Clawhub 端点，并呼叫 AI 使用它。
+6. **开始享受：** 一边操作你的软件/游戏，一边自然地向麦克风提问，让 AI 成为你的最强辅助！
 
 ## ⚠️ 注意事项与系统限制
 

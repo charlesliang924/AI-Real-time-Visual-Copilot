@@ -515,7 +515,7 @@ export default function App() {
         <div className="lg:col-span-2 flex flex-col gap-6">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold flex items-center gap-2 text-white">
-              <Terminal className="w-6 h-6 text-indigo-400" />
+              <img src="/favicon.svg" alt="Logo" className="w-6 h-6" />
               AI 实时视觉副驾
             </h1>
             <div className="flex items-center gap-3">

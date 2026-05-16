@@ -1,6 +1,6 @@
 {
-  "name": "AI Real-time Visual Copilot",
-  "description": "A web-based AI copilot that captures screen and microphone, sending them to Gemini Multimodal Live API for real-time voice guidance.",
+  "name": "AI 实时视觉副驾",
+  "description": "一个基于网页的 AI 视觉副驾，能捕获屏幕和麦克风并发给 Gemini Multimodal Live API 实现实时语音指导。",
   "requestFramePermissions": [
     "camera",
     "microphone",

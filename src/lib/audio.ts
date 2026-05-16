@@ -112,6 +112,7 @@ export class PCMPlayer {
   private audioCtx: AudioContext;
   private nextTime: number = 0;
   private isInitialized = false;
+  private activeSources: AudioBufferSourceNode[] = [];
 
   constructor(sampleRate = 24000) {
     this.audioCtx = new AudioContext({ sampleRate });
@@ -160,19 +161,35 @@ export class PCMPlayer {
     source.buffer = audioBuffer;
     source.connect(this.audioCtx.destination);
     
+    source.onended = () => {
+      this.activeSources = this.activeSources.filter(s => s !== source);
+      source.disconnect();
+    };
+
     // 简单的时钟同步逻辑
     if (this.nextTime < this.audioCtx.currentTime) {
       this.nextTime = this.audioCtx.currentTime + 0.05; // 稍微加一点缓冲
     }
     source.start(this.nextTime);
+    this.activeSources.push(source);
     this.nextTime += audioBuffer.duration;
   }
 
   stop() {
+    this.clearQueue();
     this.audioCtx.close();
   }
   
   clearQueue() {
+    this.activeSources.forEach(source => {
+      try {
+        source.stop();
+        source.disconnect();
+      } catch (e) {
+        // source may have already stopped
+      }
+    });
+    this.activeSources = [];
     this.nextTime = 0;
   }
 }

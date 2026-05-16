@@ -24,8 +24,8 @@ export default function App() {
   const [memories, setMemories] = useState<string[]>([]);
   const [isMicActive, setIsMicActive] = useState(false);
   const [micVolume, setMicVolume] = useState(0);
-  const [noiseThreshold, setNoiseThreshold] = useState(0.005);
-  const noiseThresholdRef = useRef(0.005);
+  const [noiseThreshold, setNoiseThreshold] = useState(0.015);
+  const noiseThresholdRef = useRef(0.015);
   const [logs, setLogs] = useState<string[]>([]);
   const [customSkills, setCustomSkills] = useState<CustomSkill[]>([]);
   const customSkillsRef = useRef<CustomSkill[]>([]);
@@ -509,7 +509,7 @@ export default function App() {
       {/* 隐藏的 Canvas 用于截图 */}
       <canvas ref={canvasRef} className="hidden" />
 
-      <div className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen">
+      <div className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen min-h-screen lg:max-h-screen">
         
         {/* 左侧：视频预览与状态 */}
         <div className="lg:col-span-2 flex flex-col gap-6">
@@ -586,7 +586,7 @@ export default function App() {
         </div>
 
         {/* 右侧：控制台与日志 */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 lg:h-full lg:overflow-hidden min-h-0">
           
           {/* 控制面板 */}
           <div className="bg-zinc-900/50 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
@@ -730,7 +730,7 @@ export default function App() {
           </div>
 
           {/* 日志面板 */}
-          <div className="flex-1 bg-zinc-900/50 border border-white/10 rounded-2xl p-4 backdrop-blur-sm flex flex-col overflow-hidden">
+          <div className="flex-1 bg-zinc-900/50 border border-white/10 rounded-2xl p-4 backdrop-blur-sm flex flex-col overflow-hidden min-h-[200px]">
             <h2 className="text-sm font-semibold mb-3 text-zinc-400 uppercase tracking-wider">系统日志</h2>
             <div className="flex-1 overflow-y-auto font-mono text-xs space-y-2 pr-2 custom-scrollbar">
               {logs.length === 0 ? (

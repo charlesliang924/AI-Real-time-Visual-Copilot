@@ -135,44 +135,73 @@ export class PCMPlayer {
     }
   }
 
+  private playLock: Promise<void> = Promise.resolve();
+  private queueVersion: number = 0;
+
   async playBase64(base64: string) {
-    await this.ensureContext();
+    const currentVersion = this.queueVersion;
+    const unlock = await this.acquireLock();
+    try {
+      if (this.queueVersion !== currentVersion) {
+        // Queue was cleared while we were waiting for the lock
+        return;
+      }
+      
+      await this.ensureContext();
+      
+      if (this.queueVersion !== currentVersion) {
+        // Queue was cleared while ensuring context
+        return;
+      }
 
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    
-    // Ensure even length for Int16Array to avoid RangeError
-    const validLen = len % 2 === 0 ? len : len - 1;
-    const int16Array = new Int16Array(bytes.buffer, 0, validLen / 2);
-    
-    const float32Array = new Float32Array(int16Array.length);
-    for (let i = 0; i < int16Array.length; i++) {
-      float32Array[i] = int16Array[i] / 0x8000;
-    }
-    
-    const audioBuffer = this.audioCtx.createBuffer(1, float32Array.length, this.audioCtx.sampleRate);
-    audioBuffer.getChannelData(0).set(float32Array);
-    
-    const source = this.audioCtx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(this.audioCtx.destination);
-    
-    source.onended = () => {
-      this.activeSources = this.activeSources.filter(s => s !== source);
-      source.disconnect();
-    };
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const validLen = len % 2 === 0 ? len : len - 1;
+      const int16Array = new Int16Array(bytes.buffer, 0, validLen / 2);
+      
+      const float32Array = new Float32Array(int16Array.length);
+      for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 0x8000;
+      }
+      
+      const audioBuffer = this.audioCtx.createBuffer(1, float32Array.length, this.audioCtx.sampleRate);
+      audioBuffer.getChannelData(0).set(float32Array);
+      
+      const source = this.audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.audioCtx.destination);
+      
+      source.onended = () => {
+        this.activeSources = this.activeSources.filter(s => s !== source);
+        source.disconnect();
+      };
 
-    // 简单的时钟同步逻辑
-    if (this.nextTime < this.audioCtx.currentTime) {
-      this.nextTime = this.audioCtx.currentTime + 0.05; // 稍微加一点缓冲
+      if (this.nextTime < this.audioCtx.currentTime) {
+        this.nextTime = this.audioCtx.currentTime + 0.05;
+      }
+      source.start(this.nextTime);
+      this.activeSources.push(source);
+      this.nextTime += audioBuffer.duration;
+    } finally {
+      unlock();
     }
-    source.start(this.nextTime);
-    this.activeSources.push(source);
-    this.nextTime += audioBuffer.duration;
+  }
+
+  private acquireLock(): Promise<() => void> {
+    let unlockNext: () => void;
+    const nextLock = new Promise<void>(resolve => {
+      unlockNext = resolve;
+    });
+    
+    const currentLock = this.playLock;
+    this.playLock = currentLock.then(() => nextLock);
+    
+    return currentLock.then(() => unlockNext);
   }
 
   stop() {
@@ -181,6 +210,7 @@ export class PCMPlayer {
   }
   
   clearQueue() {
+    this.queueVersion++;
     this.activeSources.forEach(source => {
       try {
         source.stop();

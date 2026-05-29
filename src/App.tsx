@@ -24,8 +24,8 @@ export default function App() {
   const [memories, setMemories] = useState<string[]>([]);
   const [isMicActive, setIsMicActive] = useState(false);
   const [micVolume, setMicVolume] = useState(0);
-  const [noiseThreshold, setNoiseThreshold] = useState(0.015);
-  const noiseThresholdRef = useRef(0.015);
+  const [noiseThreshold, setNoiseThreshold] = useState(0.025);
+  const noiseThresholdRef = useRef(0.025);
   const [logs, setLogs] = useState<string[]>([]);
   const [customSkills, setCustomSkills] = useState<CustomSkill[]>([]);
   const customSkillsRef = useRef<CustomSkill[]>([]);

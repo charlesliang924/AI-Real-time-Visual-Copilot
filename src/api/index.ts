@@ -13,6 +13,12 @@ const app = new Hono<{
   Bindings: { DB: any, JWT_SECRET: string, GEMINI_API_KEY: string };
 }>().basePath('/api');
 
+// Global error handler - ensures all errors return JSON, never HTML
+app.onError((err, c) => {
+  console.error('[API Error]', err);
+  return c.json({ error: err.message || 'Internal Server Error' }, 500);
+});
+
 // Setup auth routes
 app.route('/auth', authApp);
 app.route('/admin', adminApp);
@@ -23,7 +29,6 @@ app.route('/skills', skillsApp);
 app.route('/stats', statsApp);
 
 // Secure API config endpoint - returns Gemini API key only to authenticated & approved users
-// Key is fetched from backend-only env var (no VITE_ prefix)
 app.get('/config', async (c: any) => {
   const payload = await extractUser(c.env, c.req.header('Authorization'));
   if (!payload) {
@@ -36,11 +41,14 @@ app.get('/config', async (c: any) => {
     return c.json({ error: 'Your account is pending approval. 您的账号还在审核中，请联系管理员。' }, 403);
   }
 
-  // API Key from backend-only env var (GEMINI_API_KEY, NOT VITE_GEMINI_API_KEY)
-  const apiKey = c.env?.GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+  // API Key: check backend env vars (GEMINI_API_KEY, also VITE_GEMINI_API_KEY for backward compat)
+  const apiKey = c.env?.GEMINI_API_KEY || 
+    c.env?.VITE_GEMINI_API_KEY || 
+    (typeof process !== 'undefined' ? (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY) : '') ||
+    '';
   
   if (!apiKey) {
-    return c.json({ error: 'API Key not configured on server. 请联系管理员配置 GEMINI_API_KEY。' }, 500);
+    return c.json({ error: 'API Key not configured on server. 请在 .env 文件中配置 GEMINI_API_KEY。' }, 500);
   }
 
   // Log key access for audit

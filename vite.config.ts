@@ -6,6 +6,17 @@ import devServer from '@hono/vite-dev-server';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  
+  // Load env vars onto process.env so the Hono dev server can access them
+  // This ensures JWT_SECRET, GEMINI_API_KEY etc. are available in backend code
+  if (typeof process !== 'undefined') {
+    Object.entries(env).forEach(([key, value]) => {
+      if (!process.env[key]) {
+        process.env[key] = value;
+      }
+    });
+  }
+  
   return {
     plugins: [
       react(), 
@@ -29,7 +40,6 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
       hmr: process.env.DISABLE_HMR !== 'true',
     },
   };

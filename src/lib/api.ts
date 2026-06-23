@@ -13,12 +13,19 @@ const fetchApi = async (path: string, options: RequestInit = {}) => {
     },
   });
   
-  if (!resp.ok) {
-    const error = await resp.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || `HTTP ${resp.status}`);
+  // Safely parse JSON for both success and error responses
+  let data;
+  try {
+    data = await resp.json();
+  } catch {
+    throw new Error(`服务器错误 (HTTP ${resp.status})`);
   }
   
-  return resp.json();
+  if (!resp.ok) {
+    throw new Error(data.error || `HTTP ${resp.status}`);
+  }
+  
+  return data;
 };
 
 export const api = {

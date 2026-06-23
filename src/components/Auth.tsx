@@ -24,7 +24,14 @@ export default function Auth({ onLogin }: { onLogin: (user: any) => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
-      const data = await resp.json();
+      
+      // Safely parse JSON - handle non-JSON error responses
+      let data;
+      try {
+        data = await resp.json();
+      } catch {
+        throw new Error(`服务器错误 (HTTP ${resp.status})，请检查后端服务是否正常运行`);
+      }
 
       if (!resp.ok) {
         throw new Error(data.error || '认证失败');

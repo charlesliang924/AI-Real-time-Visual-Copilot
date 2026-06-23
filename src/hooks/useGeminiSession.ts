@@ -49,16 +49,68 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
   useEffect(() => { memoriesRef.current = memories; }, [memories]);
   useEffect(() => { customSkillsRef.current = customSkills; }, [customSkills]);
 
+  // 流式字幕合并：同一角色在 2 秒内的碎片追加到上一条，遇到句末标点则断句
+  const lastSubtitleRef = useRef<{ role: string; timestamp: number; text: string } | null>(null);
+  const pendingFlushTimerRef = useRef<number | null>(null);
+
   const addSubtitle = useCallback((role: 'user' | 'assistant', text: string) => {
-    if (!text.trim()) return;
-    const entry: SubtitleEntry = {
-      id: Date.now().toString() + Math.random().toString(36).substring(2),
-      role,
-      text: text.trim(),
-      timestamp: Date.now(),
-    };
-    setSubtitles(prev => [...prev.slice(-30), entry]);
-    onConversationAdd(role, text.trim());
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const now = Date.now();
+    // 句末标点检测
+    const sentenceEnders = /([。！？!?\n])/;
+    const endsWithSentence = sentenceEnders.test(trimmed);
+
+    // 判断是否应该追加到上一条：同一角色 + 2秒内 + 上一条未以句末标点结尾
+    const shouldAppend = lastSubtitleRef.current &&
+      lastSubtitleRef.current.role === role &&
+      now - lastSubtitleRef.current.timestamp < 2000 &&
+      !/[。！？!?\n]$/.test(lastSubtitleRef.current.text);
+
+    if (shouldAppend) {
+      // 追加到上一条
+      const combinedText = lastSubtitleRef.current.text + trimmed;
+      lastSubtitleRef.current = { role, timestamp: now, text: combinedText };
+
+      setSubtitles(prev => {
+        if (prev.length === 0) return prev;
+        const last = prev[prev.length - 1];
+        if (last.role !== role) return prev;
+        const updated = { ...last, text: combinedText, timestamp: now };
+        return [...prev.slice(0, -1), updated];
+      });
+
+      // 如果以句末标点结尾，标记这条已完成，下次新建
+      if (endsWithSentence) {
+        lastSubtitleRef.current = null;
+      }
+    } else {
+      // 新建一条
+      lastSubtitleRef.current = { role, timestamp: now, text: trimmed };
+      const entry: SubtitleEntry = {
+        id: now.toString() + Math.random().toString(36).substring(2),
+        role,
+        text: trimmed,
+        timestamp: now,
+      };
+      setSubtitles(prev => [...prev.slice(-50), entry]);
+
+      // 保存到对话历史（仅完整句子）
+      if (endsWithSentence) {
+        onConversationAdd(role, trimmed);
+        lastSubtitleRef.current = null;
+      } else {
+        // 延迟保存：2秒无新碎片则视为完整句子
+        if (pendingFlushTimerRef.current) clearTimeout(pendingFlushTimerRef.current);
+        pendingFlushTimerRef.current = window.setTimeout(() => {
+          if (lastSubtitleRef.current && lastSubtitleRef.current.role === role) {
+            onConversationAdd(role, lastSubtitleRef.current.text);
+            lastSubtitleRef.current = null;
+          }
+        }, 2500);
+      }
+    }
   }, [onConversationAdd]);
 
   const setThinking = useCallback((thinking: boolean) => {

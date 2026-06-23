@@ -277,11 +277,11 @@ export default function App() {
           />
 
           {/* Subtitles */}
-          <div className="bg-zinc-900/50 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">实时字幕</h2>
+          <div className="bg-zinc-900/50 border border-white/10 rounded-2xl p-3 backdrop-blur-sm flex flex-col max-h-[240px] min-h-[120px]">
+            <div className="flex items-center justify-between mb-2 shrink-0">
+              <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">实时字幕</h2>
               {subtitles.length > 0 && (
-                <button onClick={clearSubtitles} className="text-xs text-zinc-500 hover:text-zinc-300">清空</button>
+                <button onClick={clearSubtitles} className="text-xs text-zinc-600 hover:text-zinc-300 transition">清空</button>
               )}
             </div>
             <SubtitleDisplay subtitles={subtitles} />

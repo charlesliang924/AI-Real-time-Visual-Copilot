@@ -6,9 +6,8 @@ export function useUsageStats(userId: string | undefined) {
     if (!userId) return;
     try {
       await api.stats.log(eventType, metadata);
-    } catch (err) {
-      // Silent fail - stats are non-critical
-      console.error('Failed to log stats:', err);
+    } catch {
+      // Silent fail - stats are non-critical, don't log to console
     }
   }, [userId]);
 

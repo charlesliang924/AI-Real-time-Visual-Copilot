@@ -51,6 +51,7 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
   const reconnectTimeoutRef = useRef<number | null>(null);
   const isManualDisconnectRef = useRef(false);
   const reconnectAttemptRef = useRef(0);
+  const lastConnectTimeRef = useRef(0);
 
   // Keep refs in sync
   useEffect(() => { systemPromptRef.current = systemPrompt; }, [systemPrompt]);
@@ -158,6 +159,7 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
         callbacks: {
           onopen: () => {
             onLog('WebSocket 连接成功！');
+            lastConnectTimeRef.current = Date.now();
             setIsConnected(true);
             setIsReconnecting(false);
             setReconnectAttempt(0);
@@ -291,6 +293,7 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
             }
           },
           onclose: () => {
+            const connectionDuration = Date.now() - lastConnectTimeRef.current;
             onLog('WebSocket 连接已关闭');
             setIsConnected(false);
             setIsAiSpeaking(false);
@@ -298,8 +301,10 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
             onStatsLog('disconnect');
             
             // Auto-reconnect if not manual disconnect
+            // If connection lasted < 10s, it's likely a network/API issue - use longer backoff
             if (!isManualDisconnectRef.current) {
-              attemptReconnect();
+              const wasShortLived = connectionDuration > 0 && connectionDuration < 10000;
+              attemptReconnect(wasShortLived);
             }
           },
           onerror: (err) => {
@@ -366,20 +371,20 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
       onLog(`连接失败: ${err}`);
       // Attempt reconnect on connection failure
       if (!isManualDisconnectRef.current) {
-        attemptReconnect();
+        attemptReconnect(false);
       }
     }
   }, [onLog, onStatsLog, onMemoryAdd, addSubtitle, setThinking]);
 
   // Auto-reconnect with exponential backoff
-  const attemptReconnect = useCallback(() => {
+  const attemptReconnect = useCallback((useLongBackoff: boolean = false) => {
     if (isManualDisconnectRef.current) return;
     
     const maxAttempts = 5;
     const attempt = reconnectAttemptRef.current + 1;
     
     if (attempt > maxAttempts) {
-      onLog(`自动重连失败：已达最大重试次数 (${maxAttempts})。请手动重新连接。`);
+      onLog(`自动重连失败：已达最大重试次数 (${maxAttempts})。请检查网络后手动重新连接。`);
       setIsReconnecting(false);
       return;
     }
@@ -388,9 +393,11 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
     setReconnectAttempt(attempt);
     setIsReconnecting(true);
     
-    // Exponential backoff: 2s, 4s, 8s, 16s, 32s
-    const delay = Math.min(2000 * Math.pow(2, attempt - 1), 32000);
-    onLog(`正在自动重连... 第 ${attempt}/${maxAttempts} 次尝试，${delay / 1000}秒后重试`);
+    // Exponential backoff: 3s, 6s, 12s, 24s, 48s
+    // If connection was short-lived (network issue), use even longer delays: 5s, 10s, 20s, 40s, 60s
+    const baseDelay = useLongBackoff ? 5000 : 3000;
+    const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), useLongBackoff ? 60000 : 48000);
+    onLog(`正在自动重连... 第 ${attempt}/${maxAttempts} 次尝试，${Math.round(delay / 1000)}秒后重试`);
     
     reconnectTimeoutRef.current = window.setTimeout(() => {
       connect();

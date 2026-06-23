@@ -1,11 +1,19 @@
 import React, { useEffect, useRef } from 'react';
-import { MessageSquare, User, Bot } from 'lucide-react';
+import { MessageSquare, User, Bot, Link2, Image as ImageIcon, ExternalLink } from 'lucide-react';
+
+export interface RichContent {
+  type: 'link' | 'image';
+  url: string;
+  title?: string;
+  caption?: string;
+}
 
 export interface SubtitleEntry {
   id: string;
   role: 'user' | 'assistant';
   text: string;
   timestamp: number;
+  richContent?: RichContent;
 }
 
 export interface SubtitleDisplayProps {
@@ -21,24 +29,97 @@ function formatTime(ts: number): string {
   });
 }
 
+// URL 正则：检测文本中的 URL 并自动转为可点击链接
+const URL_REGEX = /(https?:\/\/[^\s<>"']+)/g;
+
+// 将纯文本渲染为带可点击 URL 的 JSX
+function renderTextWithLinks(text: string) {
+  const parts = text.split(URL_REGEX);
+  return parts.map((part, i) => {
+    if (URL_REGEX.test(part)) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-indigo-400 hover:text-indigo-300 underline decoration-indigo-400/40 hover:decoration-indigo-300 transition-colors break-all"
+        >
+          {part}
+        </a>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+// 链接卡片组件
+function LinkCard({ url, title }: { url: string; title: string }) {
+  let domain = '';
+  try {
+    domain = new URL(url).hostname.replace('www.', '');
+  } catch {}
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block max-w-[95%] mt-1.5 group"
+    >
+      <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/15 hover:border-indigo-500/30 transition-all">
+        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center shrink-0">
+          <Link2 className="w-4 h-4 text-indigo-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-indigo-50 font-medium truncate group-hover:text-white transition-colors">
+            {title}
+          </p>
+          <p className="text-xs text-indigo-400/60 truncate">{domain}</p>
+        </div>
+        <ExternalLink className="w-3.5 h-3.5 text-indigo-400/40 group-hover:text-indigo-300 shrink-0 transition-colors" />
+      </div>
+    </a>
+  );
+}
+
+// 图片卡片组件
+function ImageCard({ url, caption }: { url: string; caption?: string }) {
+  return (
+    <div className="max-w-[95%] mt-1.5 rounded-xl overflow-hidden bg-zinc-800/50 border border-white/10">
+      <img
+        src={url}
+        alt={caption || ''}
+        className="w-full max-h-48 object-cover"
+        loading="lazy"
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
+      {caption && (
+        <div className="flex items-center gap-1.5 px-3 py-2 text-xs text-zinc-400">
+          <ImageIcon className="w-3 h-3 shrink-0" />
+          <span>{caption}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SubtitleDisplay({ subtitles }: SubtitleDisplayProps) {
   const endRef = useRef<HTMLDivElement>(null);
 
-  // 自动滚动到底部
   useEffect(() => {
     if (endRef.current) {
       endRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
   }, [subtitles]);
 
-  // 仅显示最近 20 条
   const recentSubtitles = subtitles.slice(-20);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-      <div
-        className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar"
-      >
+      <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
         {recentSubtitles.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-zinc-600 py-6">
             <MessageSquare className="w-6 h-6 mb-1.5 opacity-40" />
@@ -48,7 +129,6 @@ export default function SubtitleDisplay({ subtitles }: SubtitleDisplayProps) {
           recentSubtitles.map((entry, idx) => {
             const isUser = entry.role === 'user';
             const prevEntry = idx > 0 ? recentSubtitles[idx - 1] : null;
-            // 同一角色连续消息只显示一次角色标签
             const showLabel = !prevEntry || prevEntry.role !== entry.role ||
               (entry.timestamp - prevEntry.timestamp > 60000);
 
@@ -72,16 +152,27 @@ export default function SubtitleDisplay({ subtitles }: SubtitleDisplayProps) {
                     <span className="text-zinc-700 font-mono">{formatTime(entry.timestamp)}</span>
                   </div>
                 )}
-                {/* 消息气泡 */}
-                <div
-                  className={`max-w-[90%] px-3 py-1.5 rounded-2xl text-sm leading-snug break-words ${
-                    isUser
-                      ? 'bg-emerald-500/10 text-emerald-50 border border-emerald-500/10 rounded-tl-md'
-                      : 'bg-indigo-500/10 text-indigo-50 border border-indigo-500/10 rounded-tr-md'
-                  }`}
-                >
-                  {entry.text}
-                </div>
+
+                {/* 富内容卡片 */}
+                {entry.richContent?.type === 'link' && (
+                  <LinkCard url={entry.richContent.url} title={entry.richContent.title || entry.richContent.url} />
+                )}
+                {entry.richContent?.type === 'image' && (
+                  <ImageCard url={entry.richContent.url} caption={entry.richContent.caption} />
+                )}
+
+                {/* 文本气泡（自动检测 URL） */}
+                {entry.text && !entry.richContent && (
+                  <div
+                    className={`max-w-[90%] px-3 py-1.5 rounded-2xl text-sm leading-snug break-words ${
+                      isUser
+                        ? 'bg-emerald-500/10 text-emerald-50 border border-emerald-500/10 rounded-tl-md'
+                        : 'bg-indigo-500/10 text-indigo-50 border border-indigo-500/10 rounded-tr-md'
+                    }`}
+                  >
+                    {renderTextWithLinks(entry.text)}
+                  </div>
+                )}
               </div>
             );
           })

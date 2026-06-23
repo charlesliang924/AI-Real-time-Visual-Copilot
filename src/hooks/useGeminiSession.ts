@@ -188,35 +188,24 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
                 } else if (fn.name === 'get_current_time') {
                   result = { time: new Date().toLocaleString() };
                 } else if (fn.name === 'show_link') {
-                  // 富内容：在字幕区展示可点击链接卡片
+                  // 富内容：在字幕区展示可点击链接卡片（图片URL自动检测并内联展示）
                   const url = String(args.url || '');
                   const title = String(args.title || url);
                   if (url) {
+                    // 判断是否为图片URL
+                    const isImage = /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?|$)/i.test(url);
                     const entry: SubtitleEntry = {
                       id: Date.now().toString() + Math.random().toString(36).substring(2),
                       role: 'assistant',
                       text: title,
                       timestamp: Date.now(),
-                      richContent: { type: 'link', url, title },
+                      richContent: isImage
+                        ? { type: 'image', url, caption: title !== url ? title : undefined }
+                        : { type: 'link', url, title },
                     };
                     setSubtitles(prev => [...prev.slice(-50), entry]);
                   }
                   result = { status: "success", message: "链接已展示" };
-                } else if (fn.name === 'show_image') {
-                  // 富内容：在字幕区展示图片
-                  const url = String(args.url || '');
-                  const caption = String(args.caption || '');
-                  if (url) {
-                    const entry: SubtitleEntry = {
-                      id: Date.now().toString() + Math.random().toString(36).substring(2),
-                      role: 'assistant',
-                      text: caption || '图片',
-                      timestamp: Date.now(),
-                      richContent: { type: 'image', url, caption },
-                    };
-                    setSubtitles(prev => [...prev.slice(-50), entry]);
-                  }
-                  result = { status: "success", message: "图片已展示" };
                 } else {
                   // Check custom skills
                   const customSkill = customSkillsRef.current.find(s => s.name === fn.name);
@@ -344,7 +333,7 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
                 },
                 {
                   name: "show_link",
-                  description: "富内容展示技能：在对话界面中展示一个可点击的链接卡片。当你需要给用户提供网页链接（如教程、文档、资源等）时调用此技能，链接会以卡片形式展示在字幕区，用户可以直接点击跳转。",
+                  description: "【重要】当你要给用户提供任何 URL 链接时，必须调用此技能，不要在语音中口述 URL。无论是网页链接还是图片链接，都通过此技能展示。界面会自动识别图片 URL 并内联显示图片，普通 URL 则展示为可点击的链接卡片。例如用户要教程链接、文档地址、图片资源等，都调用此技能。",
                   parameters: {
                     type: "OBJECT",
                     properties: {
@@ -352,18 +341,6 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
                       title: { type: "STRING", description: "链接的显示标题，简短描述这个链接的内容" }
                     },
                     required: ["url", "title"]
-                  }
-                },
-                {
-                  name: "show_image",
-                  description: "富内容展示技能：在对话界面中展示一张图片。当你需要给用户展示图片（如示意图、截图、图表等）时调用此技能，图片会直接在字幕区内显示。",
-                  parameters: {
-                    type: "OBJECT",
-                    properties: {
-                      url: { type: "STRING", description: "图片的完整 URL 地址，必须包含 http:// 或 https://" },
-                      caption: { type: "STRING", description: "图片的说明文字" }
-                    },
-                    required: ["url"]
                   }
                 },
                 ...customSkillsRef.current.map(skill => ({

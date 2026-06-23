@@ -8,15 +8,13 @@ import SubtitleDisplay from './components/SubtitleDisplay';
 import MemoryPanel from './components/MemoryPanel';
 import SkillModal from './components/SkillModal';
 import OnboardingGuide from './components/OnboardingGuide';
-import ScenePresets from './components/ScenePresets';
-import PersonaSelector from './components/PersonaSelector';
+import ScenePresets, { DEFAULT_SCENE_PROMPT } from './components/ScenePresets';
 import AdminPanel from './components/AdminPanel';
 import { useGeminiSession } from './hooks/useGeminiSession';
 import { useScreenShare } from './hooks/useScreenShare';
 import { useAudioRecorder } from './hooks/useAudioRecorder';
 import { useMemories } from './hooks/useMemories';
 import { useConversations } from './hooks/useConversations';
-import { usePersonas, defaultPersonas } from './hooks/usePersonas';
 import { useSkills } from './hooks/useSkills';
 import { useUsageStats } from './hooks/useUsageStats';
 import { api } from './lib/api';
@@ -28,8 +26,8 @@ export default function App() {
   const [showLanding, setShowLanding] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showSkillModal, setShowSkillModal] = useState(false);
-  const [currentPersonaId, setCurrentPersonaId] = useState<string>('default');
-  const [systemPrompt, setSystemPrompt] = useState<string>(defaultPersonas[0].systemPrompt);
+  const [currentScene, setCurrentScene] = useState<string>('coding');
+  const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SCENE_PROMPT);
   const [noiseThreshold, setNoiseThreshold] = useState(0.025);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -38,7 +36,6 @@ export default function App() {
   // Initialize hooks (only when user is available)
   const { memories, addMemory, deleteMemory } = useMemories(user?.id);
   const { conversations, addConversation, clearConversations } = useConversations(user?.id);
-  const { personas, createPersona, updatePersona, deletePersona } = usePersonas(user?.id);
   const { skills, createSkill, deleteSkill } = useSkills(user?.id);
   const { logEvent } = useUsageStats(user?.id);
 
@@ -107,28 +104,11 @@ export default function App() {
     setShowLanding(true);
   };
 
-  const handleSceneSelect = (sceneId: string) => {
-    const sceneMap: Record<string, string> = {
-      coding: 'coder',
-      gaming: 'default',
-      study: 'math',
-      design: 'default',
-      office: 'default',
-    };
-    const personaId = sceneMap[sceneId] || 'default';
-    const persona = personas.find(p => p.id === personaId) || defaultPersonas[0];
-    setCurrentPersonaId(persona.id);
-    setSystemPrompt(persona.systemPrompt);
-    if (isConnected) {
-      console.log('场景切换成功。将在下一次重新连接时生效。');
-    }
-  };
-
-  const handlePersonaSelect = (id: string, prompt: string) => {
-    setCurrentPersonaId(id);
+  const handleSceneSelect = (sceneId: string, prompt: string) => {
+    setCurrentScene(sceneId);
     setSystemPrompt(prompt);
     if (isConnected) {
-      console.log('角色切换成功。将在下一次重新连接时生效。');
+      console.log('场景切换成功。将在下一次重新连接时生效。');
     }
   };
 
@@ -228,15 +208,6 @@ export default function App() {
                 {isConnected ? '已连接' : '未连接'}
               </div>
               
-              <PersonaSelector 
-                currentPersonaId={currentPersonaId}
-                personas={personas}
-                onSelect={handlePersonaSelect}
-                onCreate={createPersona}
-                onUpdate={updatePersona}
-                onDelete={deletePersona}
-              />
-              
               {user.username === 'admin' && (
                 <button
                   onClick={() => setShowAdmin(true)}
@@ -260,7 +231,7 @@ export default function App() {
           </div>
 
           {/* Scene Presets */}
-          <ScenePresets currentPersonaId={currentPersonaId} onSelectScene={handleSceneSelect} />
+          <ScenePresets currentScene={currentScene} onSelectScene={handleSceneSelect} />
 
           {/* Video Preview */}
           <VideoPreview

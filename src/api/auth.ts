@@ -1,13 +1,10 @@
 import { Hono } from 'hono';
 import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
-import { query, queryFirst } from './db.js';
+import { query, queryFirst, generateId } from './db.js';
+import { getSecretKey } from './auth-utils.js';
 
 const authApp = new Hono<{ Bindings: { DB: any, JWT_SECRET: string } }>();
-
-const getSecretKey = (env: any) => {
-  return new TextEncoder().encode(env.JWT_SECRET || 'fallback_local_secret_key_123456');
-};
 
 authApp.post('/register', async (c) => {
   const { username, password } = await c.req.json();
@@ -21,7 +18,7 @@ authApp.post('/register', async (c) => {
     return c.json({ error: 'Username already exists' }, 400);
   }
 
-  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
+  const id = generateId();
   
   let passwordHash;
   try {

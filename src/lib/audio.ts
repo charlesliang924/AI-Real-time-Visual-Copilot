@@ -62,22 +62,11 @@ export class AudioRecorder {
       
       this.source = this.audioCtx.createMediaStreamSource(this.stream);
       this.processor = new AudioWorkletNode(this.audioCtx, 'pcm-processor');
-      
-      let lastLogTime = 0;
+    
       this.processor.port.onmessage = (e) => {
         const { buffer, rms } = e.data;
         
         if (onVolume) onVolume(rms);
-        
-        // 每 2 秒打印一次麦克风状态，帮助排查静音问题
-        const now = Date.now();
-        if (now - lastLogTime > 2000) {
-          console.log(`[AudioRecorder] Mic RMS: ${rms.toFixed(4)} (SampleRate: ${this.audioCtx?.sampleRate})`);
-          if (rms < 0.001) {
-            console.warn('[AudioRecorder] 麦克风输入音量极低，可能是静音、硬件问题或系统权限未开启');
-          }
-          lastLogTime = now;
-        }
 
         let binary = '';
         const bytes = new Uint8Array(buffer);

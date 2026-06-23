@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, LogOut, ShieldCheck, Clock } from 'lucide-react';
 import Auth from './components/Auth';
 import LandingPage from './components/LandingPage';
 import ControlPanel from './components/ControlPanel';
 import VideoPreview from './components/VideoPreview';
 import SubtitleDisplay from './components/SubtitleDisplay';
-import LogPanel from './components/LogPanel';
 import MemoryPanel from './components/MemoryPanel';
 import SkillModal from './components/SkillModal';
 import OnboardingGuide from './components/OnboardingGuide';
@@ -32,14 +31,9 @@ export default function App() {
   const [currentPersonaId, setCurrentPersonaId] = useState<string>('default');
   const [systemPrompt, setSystemPrompt] = useState<string>(defaultPersonas[0].systemPrompt);
   const [noiseThreshold, setNoiseThreshold] = useState(0.025);
-  const [logs, setLogs] = useState<string[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const addLog = useCallback((msg: string) => {
-    setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`].slice(-50));
-  }, []);
 
   // Initialize hooks (only when user is available)
   const { memories, addMemory, deleteMemory } = useMemories(user?.id);
@@ -59,7 +53,7 @@ export default function App() {
     customSkills: skills,
     onMemoryAdd: addMemory,
     onConversationAdd: addConversation,
-    onLog: addLog,
+    onLog: (msg: string) => console.log('[Gemini]', msg),
     onStatsLog: logEvent,
     userId: user?.id,
   });
@@ -126,7 +120,7 @@ export default function App() {
     setCurrentPersonaId(persona.id);
     setSystemPrompt(persona.systemPrompt);
     if (isConnected) {
-      addLog('场景切换成功。将在下一次重新连接时生效。');
+      console.log('场景切换成功。将在下一次重新连接时生效。');
     }
   };
 
@@ -134,14 +128,14 @@ export default function App() {
     setCurrentPersonaId(id);
     setSystemPrompt(prompt);
     if (isConnected) {
-      addLog('角色切换成功。将在下一次重新连接时生效。');
+      console.log('角色切换成功。将在下一次重新连接时生效。');
     }
   };
 
   const handleAddSkill = async (skill: { name: string; description: string; endpoint: string }) => {
     await createSkill(skill);
     setShowSkillModal(false);
-    addLog(`已添加技能: ${skill.name}`);
+    console.log(`已添加技能: ${skill.name}`);
   };
 
   // Loading state
@@ -313,8 +307,6 @@ export default function App() {
             onDeleteSkill={deleteSkill}
             onAddSkill={() => setShowSkillModal(true)}
           />
-
-          <LogPanel logs={logs} />
         </div>
       </div>
     </div>

@@ -316,6 +316,7 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
             ? "\n\n当前用户的核心记忆（请在对话中自然参考这些信息）：\n" + memoriesRef.current.map((m, i) => `${i + 1}. ${m.fact}`).join('\n') 
             : ""),
           tools: [
+            { googleSearch: {} },
             {
               functionDeclarations: [
                 {

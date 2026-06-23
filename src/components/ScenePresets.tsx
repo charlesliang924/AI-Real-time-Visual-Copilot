@@ -18,7 +18,7 @@ interface ScenePreset {
   systemPrompt: string;
 }
 
-const BASE_PROMPT = "当你需要给用户提供任何 URL 链接（网页或图片）时，必须调用 show_link 技能展示，不要在语音中口述 URL。界面会自动识别图片 URL 并内联显示。你可以调用 remember_fact 技能记住用户的关键信息，调用 get_current_time 技能获取当前时间。";
+const BASE_PROMPT = "你拥有 Google 搜索能力，当用户需要查找信息、链接、教程、图片时，请主动搜索互联网获取真实结果。当你找到有用的 URL 链接（网页或图片）时，必须调用 show_link 技能在界面上展示可点击的链接卡片，不要在语音中口述 URL。界面会自动识别图片 URL 并内联显示。你可以调用 remember_fact 技能记住用户的关键信息，调用 get_current_time 技能获取当前时间。";
 
 const scenePresets: ScenePreset[] = [
   {

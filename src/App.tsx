@@ -158,7 +158,7 @@ export default function App() {
           </div>
           <h2 className="text-2xl font-bold text-white mb-3">账号审核中</h2>
           <p className="text-zinc-400 mb-8 leading-relaxed">
-            为了控制 API 成本并确保系统质量，您的账号目前正处于等待管理员审核的状态。<br/>审核通过后即可体验完整的 ScreenMind 功能。
+            为了控制 API 成本并确保系统质量，您的账号目前正处于等待管理员审核的状态。<br/>审核通过后即可体验完整功能。
           </p>
           <button
             onClick={handleSignOut}
@@ -200,7 +200,7 @@ export default function App() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2 text-white">
               <img src="/favicon.svg" alt="Logo" className="w-6 h-6" />
-              ScreenMind
+              见你，懂你
             </h1>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border ${isConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800/50 text-zinc-400 border-zinc-700/50'}`}>

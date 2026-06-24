@@ -156,7 +156,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
           <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
             <Eye className="w-5 h-5 text-white" />
           </div>
-          <span className="text-lg font-bold text-white tracking-tight">ScreenMind</span>
+          <span className="text-lg font-bold text-white tracking-tight">见你，懂你</span>
         </div>
         <button
           onClick={onEnter}
@@ -184,7 +184,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
           transition={{ duration: 0.7, delay: 0.2 }}
           className="text-5xl md:text-7xl font-bold text-white leading-tight tracking-tight"
         >
-          ScreenMind
+          见你，懂你
         </motion.h1>
 
         <motion.p
@@ -193,7 +193,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
           transition={{ duration: 0.7, delay: 0.35 }}
           className="mt-4 text-xl md:text-2xl text-indigo-300/80 font-medium"
         >
-          看见你的屏幕，听懂你的声音
+          AI 智能屏幕
         </motion.p>
 
         <motion.p
@@ -202,8 +202,8 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
           transition={{ duration: 0.7, delay: 0.45 }}
           className="mt-6 text-base md:text-lg text-zinc-400 max-w-2xl leading-relaxed"
         >
-          无论是编程 Debug、学习解题还是游戏通关，ScreenMind 都坐在你旁边，
-          实时看屏、实时对话、实时出谋划策。
+          看见你的屏幕，听懂你的声音。无论是编程 Debug、学习解题还是游戏通关，
+          它都坐在你旁边，实时看屏、实时对话、实时出谋划策。
         </motion.p>
 
         <motion.div
@@ -366,7 +366,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
               准备好开始了吗？
             </h2>
             <p className="text-zinc-400 mb-8 max-w-xl mx-auto">
-              共享屏幕、开启麦克风，几秒钟内即可与 ScreenMind 开始实时对话。
+              共享屏幕、开启麦克风，几秒钟内即可开始实时对话。
             </p>
             <button
               onClick={onEnter}
@@ -386,7 +386,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
             <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center">
               <Eye className="w-4 h-4 text-white" />
             </div>
-            <span className="text-sm text-zinc-400">ScreenMind</span>
+            <span className="text-sm text-zinc-400">见你，懂你</span>
           </div>
           <p className="text-sm text-zinc-500">
             参赛作品 · TRAE AI 创造力大赛

@@ -51,7 +51,7 @@ export default function Auth({ onLogin }: { onLogin: (user: any) => void }) {
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4 font-sans">
       <div className="w-full max-w-md bg-zinc-900/80 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-2xl">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-white mb-2">欢迎使用 AI 视觉副驾</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">欢迎使用 ScreenMind</h1>
           <p className="text-zinc-400 text-sm">请登录或注册您的专属 AI 陪伴账号</p>
         </div>
 

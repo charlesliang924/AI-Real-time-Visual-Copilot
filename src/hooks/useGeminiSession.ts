@@ -169,7 +169,7 @@ export function useGeminiSession(params: UseGeminiSessionParams) {
             // Send greeting
             if (sessionRef.current) {
               sessionRef.current.then((session: any) => {
-                session.sendRealtimeInput({ text: "你好！我已经连接成功了，请用简短、热情的一句话和我打个招呼，告诉我你已经准备好做我的视觉副驾了。" });
+                session.sendRealtimeInput({ text: "你好！我已经连接成功了，请用简短、热情的一句话和我打个招呼，告诉我你已经准备好了。" });
               });
             }
           },

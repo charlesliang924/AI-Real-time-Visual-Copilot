@@ -4,17 +4,20 @@ import {
   Brain,
   Terminal,
   Shield,
+  ShieldCheck,
   Zap,
   Code,
   BookOpen,
   Palette,
   BarChart3,
   Gamepad2,
-  Sparkles,
   ArrowRight,
   MessageSquare,
   Link2,
   RefreshCw,
+  Heart,
+  Gift,
+  Users,
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -172,10 +175,10 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 mb-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm font-medium"
+          className="inline-flex items-center gap-2 px-4 py-1.5 mb-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm font-medium"
         >
-          <Sparkles className="w-4 h-4" />
-          基于 Gemini Live API 的实时多模态 AI
+          <Heart className="w-4 h-4" />
+          公益项目 · 审核通过即可免费使用
         </motion.div>
 
         <motion.h1
@@ -318,6 +321,77 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
         </div>
       </section>
 
+      {/* 公益初心 */}
+      <section className="relative z-10 px-6 py-16 max-w-5xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-100px' }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-10"
+        >
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm font-medium">
+            <Heart className="w-4 h-4" />
+            科技普惠 · 教育公平
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold text-white">为什么免费？</h2>
+          <p className="mt-3 text-zinc-400">好的教育资源不该只属于付费的人</p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="bg-zinc-900/50 border border-white/10 rounded-2xl p-6"
+          >
+            <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-white/10 flex items-center justify-center mb-4">
+              <Gift className="w-5 h-5 text-emerald-400" />
+            </div>
+            <h3 className="text-base font-semibold text-white mb-2">完全免费</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              无论是编程 Debug、学习解题还是设计反馈，所有功能对审核通过的用户完全免费开放。
+              科技应该普惠，而不是只有付费才能享受。
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="bg-zinc-900/50 border border-white/10 rounded-2xl p-6"
+          >
+            <div className="w-11 h-11 rounded-xl bg-sky-500/10 border border-white/10 flex items-center justify-center mb-4">
+              <ShieldCheck className="w-5 h-5 text-sky-400" />
+            </div>
+            <h3 className="text-base font-semibold text-white mb-2">审核制保障</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              AI 接口有真实成本，审核制是为了把有限资源优先分配给真正有学习需求的人，
+              而非被滥用或闲置。这不是限制，是对资源的负责。
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="bg-zinc-900/50 border border-white/10 rounded-2xl p-6"
+          >
+            <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-white/10 flex items-center justify-center mb-4">
+              <Users className="w-5 h-5 text-amber-400" />
+            </div>
+            <h3 className="text-base font-semibold text-white mb-2">谁适合用</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              自学编程的新人、需要辅导的学生、请不起家教的家庭、缺少指导的创作者。
+              只要你有真实的学习或创作需求，都欢迎申请。
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
       {/* 技术栈 */}
       <section className="relative z-10 px-6 py-16 max-w-5xl mx-auto">
         <motion.div
@@ -363,10 +437,10 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.08),transparent_70%)]" />
           <div className="relative">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              准备好开始了吗？
+              有学习需求？欢迎申请
             </h2>
             <p className="text-zinc-400 mb-8 max-w-xl mx-auto">
-              共享屏幕、开启麦克风，几秒钟内即可开始实时对话。
+              注册后提交审核，通过即可免费使用全部功能。共享屏幕、开启麦克风，几秒钟内开始实时对话。
             </p>
             <button
               onClick={onEnter}
@@ -389,7 +463,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
             <span className="text-sm text-zinc-400">见你，懂你</span>
           </div>
           <p className="text-sm text-zinc-500">
-            参赛作品 · TRAE AI 创造力大赛
+            公益项目 · TRAE AI 创造力大赛
           </p>
           <p className="text-xs text-zinc-600">
             基于 React 19 · Gemini Live API · Cloudflare · Hono.js 构建

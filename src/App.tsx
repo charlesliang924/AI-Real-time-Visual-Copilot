@@ -158,7 +158,7 @@ export default function App() {
           </div>
           <h2 className="text-2xl font-bold text-white mb-3">账号审核中</h2>
           <p className="text-zinc-400 mb-8 leading-relaxed">
-            为了控制 API 成本并确保系统质量，您的账号目前正处于等待管理员审核的状态。<br/>审核通过后即可体验完整功能。
+            为了把有限的 AI 资源优先分配给真正有学习需求的人，您的账号正在等待管理员审核。<br/>审核通过后即可免费使用全部功能，感谢您的耐心等待。
           </p>
           <button
             onClick={handleSignOut}
